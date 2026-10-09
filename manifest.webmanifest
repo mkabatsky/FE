@@ -1,0 +1,14 @@
+{
+  "name": "Field Engineering Tracker",
+  "short_name": "Field Eng",
+  "description": "A job's equipment from the Equipment Database, with the network and set-up details for each device.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f2f4f7",
+  "theme_color": "#1a3a6b",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"}
+  ]
+}
