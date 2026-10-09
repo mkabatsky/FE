@@ -4,311 +4,1086 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#1a3a6b">
 <link rel="manifest" href="manifest.webmanifest">
+<script src="config.js"></script>
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<meta name="apple-mobile-web-app-title" content="Apps">
+<meta name="apple-mobile-web-app-title" content="Field Eng">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>Apps</title>
+<title>Field Engineering Tracker</title>
 <style>
   :root{
     color-scheme: light dark;
-    --strip:#1a3a6b; --strip-ink:#d5dfef; --tab-hover:rgba(255,255,255,.13);
-    --page:#f2f4f7; --ink:#1a2530; --ink-muted:#64707c; --surface:#ffffff; --border:#d6dce3; --accent:#b8720f; --accent-ink:#ffffff;
+    --bg:#f2f4f7; --surface:#ffffff; --surface-alt:#e9edf2; --border:#d6dce3;
+    --ink:#1a2530; --ink-muted:#64707c; --navy:#1a3a6b;
+    --accent:#b8720f; --accent-ink:#ffffff; --danger:#af2c1e; --success:#3a7d44; --focus:#b8720f;
+    --warn-bg:#fff4e0; --warn-ink:#8a5a00; --bad-bg:#fbe9e7;
+    --shadow:0 1px 2px rgba(20,26,33,.06),0 4px 14px rgba(20,26,33,.06);
   }
   @media (prefers-color-scheme: dark){
     :root{
-      --strip:#0b0f14; --strip-ink:#a9b5c2; --tab-hover:rgba(255,255,255,.09);
-      --page:#12161b; --ink:#e7eaee; --ink-muted:#96a2ad; --surface:#1b2129; --border:#333e4a; --accent:#e0a032; --accent-ink:#171207;
+      --bg:#12161b; --surface:#1b2129; --surface-alt:#222a33; --border:#333e4a;
+      --ink:#e7eaee; --ink-muted:#96a2ad; --navy:#3d68b0;
+      --accent:#e0a032; --accent-ink:#171207; --danger:#e05d4c; --success:#5cba69; --focus:#e0a032;
+      --warn-bg:#3a2e12; --warn-ink:#f0c060; --bad-bg:#3b1a16;
+      --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 20px rgba(0,0,0,.35);
     }
   }
   *{box-sizing:border-box;}
-  html,body{margin:0;height:100%;overflow:hidden;}
-  body{display:flex;flex-direction:column;height:100vh;height:100dvh;background:var(--strip);color:var(--ink);
-    font-family:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;font-size:14px;line-height:1.45;}
+  html,body{margin:0;}
+  body{background:var(--bg);color:var(--ink);font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:14px;line-height:1.4;
+    padding:14px 16px calc(16px + env(safe-area-inset-bottom));}
   [hidden]{display:none !important;}
+  h1,h2,h3,p{margin:0;}
+  button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--ink);padding:8px 13px;font-size:13px;font-weight:500;white-space:nowrap;}
+  button:hover{background:var(--surface-alt);}
+  button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);}
+  button.primary:hover{filter:brightness(1.06);background:var(--accent);}
+  button:disabled{opacity:.5;cursor:default;}
+  input,select{font:inherit;color:inherit;}
+  .mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;}
 
-  /* ---- the tab strip ---- */
-  #tabs{flex:0 0 auto;display:flex;align-items:flex-end;gap:2px;background:var(--strip);
-    padding:6px calc(8px + env(safe-area-inset-right)) 0 calc(8px + env(safe-area-inset-left));
-    padding-top:calc(6px + env(safe-area-inset-top));}
-  .tab{font:inherit;font-size:13px;font-weight:600;color:var(--strip-ink);background:transparent;border:0;
-    border-radius:9px 9px 0 0;padding:9px 20px 10px;min-height:38px;min-width:0;max-width:240px;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}
-  .tab:hover{background:var(--tab-hover);}
-  /* the open tab takes the colour of the app under it, so the two read as one piece */
-  .tab[aria-selected="true"]{background:var(--l);color:#1a2530;cursor:default;}
-  @media (prefers-color-scheme: dark){ .tab[aria-selected="true"]{background:var(--d);color:#e7eaee;} }
-  .tab:focus-visible, .strip-btn:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;}
-  .tab .short{display:none;}
-  .spacer{flex:1 1 auto;}
-  #buildTag{align-self:center;margin:0 6px 4px;font-size:11px;color:var(--strip-ink);opacity:.7;white-space:nowrap;}
-  .strip-btn{align-self:center;margin-bottom:4px;display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;
-    border:0;border-radius:8px;background:transparent;color:var(--strip-ink);cursor:pointer;}
-  .strip-btn:hover{background:var(--tab-hover);}
-  /* a login with only one app gets that app full-screen, exactly as it looks on its own */
-  body.single #tabs{display:none;}
-  /* fingers need a bigger target than a mouse does */
-  @media (pointer:coarse){
-    .tab{min-height:44px;font-size:14px;padding-top:11px;padding-bottom:12px;}
-    .strip-btn{width:40px;height:40px;}
+  /* ---- sign in ---- */
+  #login{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;background:var(--bg);z-index:50;}
+  .login-card{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:24px;display:flex;flex-direction:column;gap:12px;}
+  .login-card h1{font-size:19px;}
+  .login-card p{color:var(--ink-muted);font-size:13px;}
+  .login-card label{display:flex;flex-direction:column;gap:5px;font-size:12.5px;font-weight:600;color:var(--ink-muted);}
+  .login-card input{font-size:16px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--ink);}
+  .login-card button{min-height:44px;font-size:15px;}
+  .login-err{color:var(--danger);font-weight:600;font-size:13px;min-height:18px;}
+
+  /* ---- top bar ---- */
+  .top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;}
+  .brand{display:flex;align-items:center;gap:12px;min-width:0;}
+  .badge{width:40px;height:40px;border-radius:10px;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex:none;}
+  .brand h1{font-size:19px;line-height:1.2;}
+  .build{font-size:11px;font-weight:700;color:var(--ink-muted);border:1px solid var(--border);border-radius:99px;padding:1px 8px;margin-left:6px;vertical-align:middle;white-space:nowrap;}
+  .sub{font-size:12.5px;color:var(--ink-muted);}
+  .top-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-muted);}
+  .top-right button{padding:6px 11px;font-size:12.5px;}
+  .sync{display:inline-flex;align-items:center;gap:6px;}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--success);flex:none;}
+  .dot.busy{background:var(--accent);}
+  .dot.bad{background:var(--danger);}
+  .who{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .role-tag{font-weight:700;text-transform:uppercase;letter-spacing:.03em;font-size:11px;padding:3px 9px;border-radius:99px;background:var(--surface-alt);color:var(--ink-muted);}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);}
+  .notice{padding:10px 14px;border-radius:10px;background:var(--warn-bg);color:var(--warn-ink);font-weight:600;font-size:13px;margin-bottom:12px;}
+
+  /* ---- jobs ---- */
+  .jobs-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px;}
+  .jobs-bar input[type=search]{flex:1 1 260px;min-width:0;font-size:15px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);}
+  .jobs-bar label{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-muted);}
+  .job-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;}
+  .job-card{text-align:left;white-space:normal;padding:14px 16px;border-radius:12px;display:flex;flex-direction:column;gap:4px;}
+  .job-card .jn{font-weight:700;font-size:15px;overflow-wrap:anywhere;}
+  .job-card .jd{font-size:12.5px;color:var(--ink-muted);font-weight:400;overflow-wrap:anywhere;}
+  .job-card .ja{font-size:11px;font-weight:700;text-transform:uppercase;color:var(--ink-muted);}
+  .empty{color:var(--ink-muted);padding:24px 4px;}
+
+  /* ---- job ---- */
+  .jobbar{padding:14px 16px;margin-bottom:12px;display:flex;gap:16px;align-items:center;flex-wrap:wrap;}
+  .jobbar .jt{flex:1 1 300px;min-width:0;}
+  .jobbar h2{font-size:18px;overflow-wrap:anywhere;}
+  .progress{flex:0 1 320px;min-width:200px;}
+  .bar{height:8px;border-radius:99px;background:var(--surface-alt);overflow:hidden;margin-bottom:5px;}
+  .bar > i{display:block;height:100%;width:0;background:var(--success);border-radius:99px;transition:width .2s;}
+  .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;}
+  .toolbar input[type=search]{flex:1 1 220px;min-width:0;font-size:14px;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:var(--surface);}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;}
+  .chips button{border-radius:99px;padding:6px 12px;font-size:12.5px;color:var(--ink-muted);}
+  .chips button.active{background:var(--navy);border-color:var(--navy);color:#fff;}
+  .toolbar label{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink-muted);white-space:nowrap;}
+  .toolbar .spacer{flex:1 1 0;}
+
+  .grid-wrap{overflow:auto;max-height:calc(100vh - 290px);min-height:240px;}
+  table.grid{border-collapse:separate;border-spacing:0;width:max-content;min-width:100%;font-size:13px;}
+  .grid th{position:sticky;top:0;z-index:3;background:var(--surface-alt);color:var(--ink-muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em;font-weight:700;
+    text-align:left;padding:9px 10px;border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none;}
+  .grid th.fe{color:var(--ink);}
+  .grid th .arrow{font-size:9px;margin-left:4px;}
+  .grid td{border-bottom:1px solid var(--border);padding:0;vertical-align:middle;background:var(--surface);}
+  .grid tr:last-child td{border-bottom:none;}
+  .grid td.ro{padding:7px 10px;color:var(--ink);overflow-wrap:anywhere;}
+  .grid td.c-deviceType{color:var(--ink-muted);}
+  .grid td input, .grid td select{display:block;width:100%;border:1px solid transparent;border-radius:0;background:transparent;padding:8px 9px;min-height:34px;}
+  .grid td input:focus, .grid td select:focus{outline:none;border-color:var(--focus);background:var(--bg);}
+  .grid td input[readonly]{color:var(--ink-muted);}
+  .grid td input.from-db{color:var(--ink-muted);}
+  .grid td input.warn{background:var(--warn-bg);}
+  .grid td input.bad{background:var(--bad-bg);box-shadow:inset 0 0 0 1px var(--danger);}
+  .grid td input.secret.masked{-webkit-text-security:disc;}
+  .grid tr.is-na td{opacity:.5;}
+  .grid tr.is-na td.c-status{opacity:1;}
+  .grid select.st-in_progress{color:var(--warn-ink);font-weight:700;}
+  .grid select.st-done{color:var(--success);font-weight:700;}
+  .grid select.st-na{color:var(--ink-muted);}
+  .qty{display:flex;align-items:center;gap:6px;white-space:nowrap;}
+  .mini{padding:2px 8px;font-size:11.5px;border-radius:6px;min-height:0;}
+  .more-row{padding:14px;text-align:center;color:var(--ink-muted);}
+  /* the first four columns stay put while the rest slides */
+  @media (min-width:1101px){
+    .grid .s1,.grid .s2,.grid .s3,.grid .s4{position:sticky;z-index:2;}
+    .grid th.s1,.grid th.s2,.grid th.s3,.grid th.s4{z-index:4;}
+    .grid .s1{left:0;} .grid .s2{left:120px;} .grid .s3{left:230px;} .grid .s4{left:360px;box-shadow:1px 0 0 var(--border);}
   }
-  @media (max-width:560px){
-    #tabs{padding-left:calc(4px + env(safe-area-inset-left));padding-right:calc(4px + env(safe-area-inset-right));}
-    .tab{flex:1 1 0;padding:10px 6px;min-height:44px;text-align:center;}
-    .tab .long{display:none;} .tab .short{display:inline;}
-    #buildTag{display:none;}
+
+  /* Tablets and phones: one card per device instead of a 20-column table */
+  @media (max-width:1100px){
+    .grid-wrap{overflow:visible;max-height:none;border:none;background:transparent;box-shadow:none;}
+    table.grid, .grid tbody{display:block;width:100%;min-width:0;}
+    .grid thead{display:none;}
+    .grid tr{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 12px;padding:14px;margin-bottom:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface);box-shadow:var(--shadow);}
+    .grid td{display:block;border:none;padding:0;background:transparent;min-width:0;}
+    .grid td.ro{padding:0;font-weight:600;}
+    .grid td::before{content:attr(data-label);display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;font-weight:600;color:var(--ink-muted);margin-bottom:4px;}
+    .grid td input, .grid td select{border:1px solid var(--border);border-radius:8px;min-height:44px;background:var(--bg);font-size:16px;padding:9px 11px;}
+    .grid td.c-deviceType, .grid td.c-notes{grid-column:1 / -1;}
+    .grid td.c-model{grid-column:span 2;}
+    .more-row{display:block;}
   }
-
-  /* ---- one pane per app, stacked; only the open one shows. Kept in place (not
-     removed) so each app holds its width and its place while another is open. ---- */
-  #panes{flex:1 1 auto;position:relative;min-height:0;background:var(--page);}
-  .pane{position:absolute;top:0;left:0;right:0;bottom:0;visibility:hidden;}
-  .pane.active{visibility:visible;}
-  .pane iframe{display:block;width:100%;height:100%;border:0;background:var(--page);}
-
-  .msg{height:100%;overflow:auto;display:flex;align-items:center;justify-content:center;padding:24px 18px;background:var(--page);}
-  .msg-card{max-width:560px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px 24px;}
-  .msg-card h1{margin:0 0 8px;font-size:18px;}
-  .msg-card p{margin:0 0 10px;color:var(--ink-muted);}
-  .msg-card code{font-family:Consolas,"SF Mono",monospace;font-size:13px;color:var(--ink);word-break:break-all;}
-  .msg-card button{font:inherit;font-weight:600;margin-top:6px;padding:9px 16px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);cursor:pointer;}
+  @media (max-width:640px){
+    body{padding:10px 10px calc(14px + env(safe-area-inset-bottom));}
+    .grid tr{grid-template-columns:1fr 1fr;}
+    .grid td.c-model{grid-column:auto;}
+    .brand h1{font-size:16px;}
+  }
+  #snackbar{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:13px;max-width:calc(100vw - 24px);box-shadow:var(--shadow);z-index:60;opacity:0;pointer-events:none;transition:opacity .2s;}
+  #snackbar.show{opacity:1;}
 </style>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
 </head>
 <body>
 
-<div id="tabs" role="tablist" aria-label="Apps">
-  <span class="spacer" id="tabSpacer"></span>
-  <span id="buildTag" title="Build 1 - October 8, 2026">Build 1</span>
-  <button type="button" class="strip-btn" id="reloadBtn" title="Reload this tab" aria-label="Reload this tab">
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
-  </button>
+<div id="login">
+  <form class="login-card" id="loginForm" autocomplete="on">
+    <h1>Field Engineering Tracker</h1>
+    <p id="loginSub">Sign in with the same email and password as the Equipment Database and the Install Tracker.</p>
+    <label>Email<input type="email" id="loginEmail" autocomplete="username" required></label>
+    <label>Password<input type="password" id="loginPassword" autocomplete="current-password" required></label>
+    <div class="login-err" id="loginErr" role="alert" aria-live="assertive"></div>
+    <button class="primary" id="loginBtn" type="submit">Sign in</button>
+  </form>
 </div>
-<div id="panes"></div>
+
+<div id="app" hidden>
+  <header class="top">
+    <div class="brand">
+      <div class="badge">FE</div>
+      <div>
+        <h1>Field Engineering Tracker<span class="build" id="buildTag" title="Build 1 - October 8, 2026">Build 1</span></h1>
+        <p class="sub" id="subhead">Equipment from the Database, with the network and set-up details for each device.</p>
+      </div>
+    </div>
+    <div class="top-right">
+      <span class="sync"><span class="dot" id="syncDot"></span><span id="syncLabel">Ready</span></span>
+      <span class="role-tag" id="roleTag" hidden></span>
+      <span class="who" id="userEmail"></span>
+      <button type="button" id="jobsBtn">Jobs</button>
+      <button type="button" id="signOutBtn">Sign out</button>
+    </div>
+  </header>
+
+  <div class="notice" id="notice" hidden></div>
+
+  <section id="jobsView" hidden>
+    <div class="jobs-bar">
+      <input type="search" id="jobSearch" placeholder="Find a job by name, job number or address..." autocomplete="off">
+      <label><input type="checkbox" id="jobArchived"> Show archived jobs</label>
+    </div>
+    <div class="job-list" id="jobList"></div>
+    <div class="empty" id="jobsMsg"></div>
+  </section>
+
+  <section id="jobView" hidden>
+    <div class="card jobbar">
+      <div class="jt">
+        <h2 id="jobTitle"></h2>
+        <p class="sub" id="jobDetail"></p>
+      </div>
+      <div class="progress">
+        <div class="bar"><i id="progressBar"></i></div>
+        <p class="sub" id="progressText"></p>
+      </div>
+    </div>
+    <div class="toolbar">
+      <input type="search" id="search" placeholder="Search: barcode, model, serial, MAC, IP, host name, location..." autocomplete="off">
+      <div class="chips" id="chips" role="group" aria-label="Filter by status">
+        <button type="button" class="active" data-st="all">All</button>
+        <button type="button" data-st="">Not started</button>
+        <button type="button" data-st="in_progress">In progress</button>
+        <button type="button" data-st="done">Done</button>
+        <button type="button" data-st="na">N/A</button>
+      </div>
+      <span class="spacer"></span>
+      <label title="Show what is typed in the Password column"><input type="checkbox" id="showSecrets"> Show passwords</label>
+      <label title="Leave unticked to keep the Login and Password columns out of the spreadsheet"><input type="checkbox" id="exportSecrets"> Include logins in export</label>
+      <button type="button" id="exportBtn">Export Excel</button>
+    </div>
+    <div class="card grid-wrap" id="gridWrap">
+      <table class="grid" id="grid"><thead id="gridHead"></thead><tbody id="gridBody"></tbody></table>
+      <div class="more-row" id="moreRow" hidden></div>
+    </div>
+    <datalist id="locList"></datalist>
+  </section>
+</div>
+
+<div id="snackbar" role="status" aria-live="polite"></div>
+
+<script id="supabaseLibSource" type="text/plain">!function(e,t){"object"==typeof exports&&"object"==typeof module?module.exports=t():"function"==typeof define&&define.amd?define([],t):"object"==typeof exports?exports.supabase=t():e.supabase=t()}(self,(()=>(()=>{"use strict";var e,t,r,s,i={334:(e,t,r)=>{r.r(t),r.d(t,{AuthAdminApi:()=>fe,AuthApiError:()=>u,AuthClient:()=>pe,AuthError:()=>l,AuthImplicitGrantRedirectError:()=>_,AuthInvalidCredentialsError:()=>m,AuthInvalidJwtError:()=>j,AuthInvalidTokenResponseError:()=>y,AuthPKCEGrantCodeExchangeError:()=>b,AuthRetryableFetchError:()=>k,AuthSessionMissingError:()=>g,AuthUnknownError:()=>f,AuthWeakPasswordError:()=>S,CustomAuthError:()=>p,GoTrueAdminApi:()=>se,GoTrueClient:()=>de,NavigatorLockAcquireTimeoutError:()=>ce,isAuthApiError:()=>d,isAuthError:()=>h,isAuthImplicitGrantRedirectError:()=>w,isAuthRetryableFetchError:()=>T,isAuthSessionMissingError:()=>v,isAuthWeakPasswordError:()=>E,lockInternals:()=>oe,navigatorLock:()=>le});const s="2.69.1",i=3e4,n={"X-Client-Info":`gotrue-js/${s}`},o="X-Supabase-Api-Version",a={"2024-01-01":{timestamp:Date.parse("2024-01-01T00:00:00.0Z"),name:"2024-01-01"}},c=/^([a-z0-9_-]{4})*($|[a-z0-9_-]{3}$|[a-z0-9_-]{2}$)$/i;class l extends Error{constructor(e,t,r){super(e),this.__isAuthError=!0,this.name="AuthError",this.status=t,this.code=r}}function h(e){return"object"==typeof e&&null!==e&&"__isAuthError"in e}class u extends l{constructor(e,t,r){super(e,t,r),this.name="AuthApiError",this.status=t,this.code=r}}function d(e){return h(e)&&"AuthApiError"===e.name}class f extends l{constructor(e,t){super(e),this.name="AuthUnknownError",this.originalError=t}}class p extends l{constructor(e,t,r,s){super(e,r,s),this.name=t,this.status=r}}class g extends p{constructor(){super("Auth session missing!","AuthSessionMissingError",400,void 0)}}function v(e){return h(e)&&"AuthSessionMissingError"===e.name}class y extends p{constructor(){super("Auth session or user missing","AuthInvalidTokenResponseError",500,void 0)}}class m extends p{constructor(e){super(e,"AuthInvalidCredentialsError",400,void 0)}}class _ extends p{constructor(e,t=null){super(e,"AuthImplicitGrantRedirectError",500,void 0),this.details=null,this.details=t}toJSON(){return{name:this.name,message:this.message,status:this.status,details:this.details}}}function w(e){return h(e)&&"AuthImplicitGrantRedirectError"===e.name}class b extends p{constructor(e,t=null){super(e,"AuthPKCEGrantCodeExchangeError",500,void 0),this.details=null,this.details=t}toJSON(){return{name:this.name,message:this.message,status:this.status,details:this.details}}}class k extends p{constructor(e,t){super(e,"AuthRetryableFetchError",t,void 0)}}function T(e){return h(e)&&"AuthRetryableFetchError"===e.name}class S extends p{constructor(e,t,r){super(e,"AuthWeakPasswordError",t,"weak_password"),this.reasons=r}}function E(e){return h(e)&&"AuthWeakPasswordError"===e.name}class j extends p{constructor(e){super(e,"AuthInvalidJwtError",400,"invalid_jwt")}}const O="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_".split(""),P=" \t\n\r=".split(""),A=(()=>{const e=new Array(128);for(let t=0;t<e.length;t+=1)e[t]=-1;for(let t=0;t<P.length;t+=1)e[P[t].charCodeAt(0)]=-2;for(let t=0;t<O.length;t+=1)e[O[t].charCodeAt(0)]=t;return e})();function $(e,t,r){const s=A[e];if(!(s>-1)){if(-2===s)return;throw new Error(`Invalid Base64-URL character "${String.fromCharCode(e)}"`)}for(t.queue=t.queue<<6|s,t.queuedBits+=6;t.queuedBits>=8;)r(t.queue>>t.queuedBits-8&255),t.queuedBits-=8}function C(e){const t=[],r=e=>{t.push(String.fromCodePoint(e))},s={utf8seq:0,codepoint:0},i={queue:0,queuedBits:0},n=e=>{!function(e,t,r){if(0===t.utf8seq){if(e<=127)return void r(e);for(let r=1;r<6;r+=1)if(!(e>>7-r&1)){t.utf8seq=r;break}if(2===t.utf8seq)t.codepoint=31&e;else if(3===t.utf8seq)t.codepoint=15&e;else{if(4!==t.utf8seq)throw new Error("Invalid UTF-8 sequence");t.codepoint=7&e}t.utf8seq-=1}else if(t.utf8seq>0){if(e<=127)throw new Error("Invalid UTF-8 sequence");t.codepoint=t.codepoint<<6|63&e,t.utf8seq-=1,0===t.utf8seq&&r(t.codepoint)}}(e,s,r)};for(let t=0;t<e.length;t+=1)$(e.charCodeAt(t),i,n);return t.join("")}function x(e,t){if(!(e<=127)){if(e<=2047)return t(192|e>>6),void t(128|63&e);if(e<=65535)return t(224|e>>12),t(128|e>>6&63),void t(128|63&e);if(e<=1114111)return t(240|e>>18),t(128|e>>12&63),t(128|e>>6&63),void t(128|63&e);throw new Error(`Unrecognized Unicode codepoint: ${e.toString(16)}`)}t(e)}function R(e){const t=[],r={queue:0,queuedBits:0},s=e=>{t.push(e)};for(let t=0;t<e.length;t+=1)$(e.charCodeAt(t),r,s);return new Uint8Array(t)}const I=()=>"undefined"!=typeof window&&"undefined"!=typeof document,L={tested:!1,writable:!1},U=()=>{if(!I())return!1;try{if("object"!=typeof globalThis.localStorage)return!1}catch(e){return!1}if(L.tested)return L.writable;const e=`lswt-${Math.random()}${Math.random()}`;try{globalThis.localStorage.setItem(e,e),globalThis.localStorage.removeItem(e),L.tested=!0,L.writable=!0}catch(e){L.tested=!0,L.writable=!1}return L.writable},D=e=>{let t;return t=e||("undefined"==typeof fetch?(...e)=>Promise.resolve().then(r.bind(r,907)).then((({default:t})=>t(...e))):fetch),(...e)=>t(...e)},N=e=>"object"==typeof e&&null!==e&&"status"in e&&"ok"in e&&"json"in e&&"function"==typeof e.json,F=async(e,t,r)=>{await e.setItem(t,JSON.stringify(r))},M=async(e,t)=>{const r=await e.getItem(t);if(!r)return null;try{return JSON.parse(r)}catch(e){return r}},B=async(e,t)=>{await e.removeItem(t)};class q{constructor(){this.promise=new q.promiseConstructor(((e,t)=>{this.resolve=e,this.reject=t}))}}function J(e){const t=e.split(".");if(3!==t.length)throw new j("Invalid JWT structure");for(let e=0;e<t.length;e++)if(!c.test(t[e]))throw new j("JWT not in base64url format");return{header:JSON.parse(C(t[0])),payload:JSON.parse(C(t[1])),signature:R(t[2]),raw:{header:t[0],payload:t[1]}}}function H(e){return("0"+e.toString(16)).substr(-2)}async function z(e,t,r=!1){const s=function(){const e=new Uint32Array(56);if("undefined"==typeof crypto){const e="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~",t=e.length;let r="";for(let s=0;s<56;s++)r+=e.charAt(Math.floor(Math.random()*t));return r}return crypto.getRandomValues(e),Array.from(e,H).join("")}();let i=s;r&&(i+="/PASSWORD_RECOVERY"),await F(e,`${t}-code-verifier`,i);const n=await async function(e){if("undefined"==typeof crypto||void 0===crypto.subtle||"undefined"==typeof TextEncoder)return console.warn("WebCrypto API is not supported. Code challenge method will default to use plain instead of sha256."),e;const t=await async function(e){const t=(new TextEncoder).encode(e),r=await crypto.subtle.digest("SHA-256",t),s=new Uint8Array(r);return Array.from(s).map((e=>String.fromCharCode(e))).join("")}(e);return btoa(t).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"")}(s);return[n,s===n?"plain":"s256"]}q.promiseConstructor=Promise;const G=/^2[0-9]{3}-(0[1-9]|1[0-2])-(0[1-9]|1[0-9]|2[0-9]|3[0-1])$/i;const K=e=>e.msg||e.message||e.error_description||e.error||JSON.stringify(e),W=[502,503,504];async function V(e){var t;if(!N(e))throw new k(K(e),0);if(W.includes(e.status))throw new k(K(e),e.status);let r,s;try{r=await e.json()}catch(e){throw new f(K(e),e)}const i=function(e){const t=e.headers.get(o);if(!t)return null;if(!t.match(G))return null;try{return new Date(`${t}T00:00:00.0Z`)}catch(e){return null}}(e);if(i&&i.getTime()>=a["2024-01-01"].timestamp&&"object"==typeof r&&r&&"string"==typeof r.code?s=r.code:"object"==typeof r&&r&&"string"==typeof r.error_code&&(s=r.error_code),s){if("weak_password"===s)throw new S(K(r),e.status,(null===(t=r.weak_password)||void 0===t?void 0:t.reasons)||[]);if("session_not_found"===s)throw new g}else if("object"==typeof r&&r&&"object"==typeof r.weak_password&&r.weak_password&&Array.isArray(r.weak_password.reasons)&&r.weak_password.reasons.length&&r.weak_password.reasons.reduce(((e,t)=>e&&"string"==typeof t),!0))throw new S(K(r),e.status,r.weak_password.reasons);throw new u(K(r),e.status||500,s)}async function Y(e,t,r,s){var i;const n=Object.assign({},null==s?void 0:s.headers);n[o]||(n[o]=a["2024-01-01"].name),(null==s?void 0:s.jwt)&&(n.Authorization=`Bearer ${s.jwt}`);const c=null!==(i=null==s?void 0:s.query)&&void 0!==i?i:{};(null==s?void 0:s.redirectTo)&&(c.redirect_to=s.redirectTo);const l=Object.keys(c).length?"?"+new URLSearchParams(c).toString():"",h=await async function(e,t,r,s,i,n){const o=((e,t,r,s)=>{const i={method:e,headers:(null==t?void 0:t.headers)||{}};return"GET"===e?i:(i.headers=Object.assign({"Content-Type":"application/json;charset=UTF-8"},null==t?void 0:t.headers),i.body=JSON.stringify(s),Object.assign(Object.assign({},i),r))})(t,s,{},n);let a;try{a=await e(r,Object.assign({},o))}catch(e){throw console.error(e),new k(K(e),0)}if(a.ok||await V(a),null==s?void 0:s.noResolveJson)return a;try{return await a.json()}catch(e){await V(e)}}(e,t,r+l,{headers:n,noResolveJson:null==s?void 0:s.noResolveJson},0,null==s?void 0:s.body);return(null==s?void 0:s.xform)?null==s?void 0:s.xform(h):{data:Object.assign({},h),error:null}}function Q(e){var t;let r=null;var s;return function(e){return e.access_token&&e.refresh_token&&e.expires_in}(e)&&(r=Object.assign({},e),e.expires_at||(r.expires_at=(s=e.expires_in,Math.round(Date.now()/1e3)+s))),{data:{session:r,user:null!==(t=e.user)&&void 0!==t?t:e},error:null}}function X(e){const t=Q(e);return!t.error&&e.weak_password&&"object"==typeof e.weak_password&&Array.isArray(e.weak_password.reasons)&&e.weak_password.reasons.length&&e.weak_password.message&&"string"==typeof e.weak_password.message&&e.weak_password.reasons.reduce(((e,t)=>e&&"string"==typeof t),!0)&&(t.data.weak_password=e.weak_password),t}function Z(e){var t;return{data:{user:null!==(t=e.user)&&void 0!==t?t:e},error:null}}function ee(e){return{data:e,error:null}}function te(e){const{action_link:t,email_otp:r,hashed_token:s,redirect_to:i,verification_type:n}=e,o=function(e,t){var r={};for(var s in e)Object.prototype.hasOwnProperty.call(e,s)&&t.indexOf(s)<0&&(r[s]=e[s]);if(null!=e&&"function"==typeof Object.getOwnPropertySymbols){var i=0;for(s=Object.getOwnPropertySymbols(e);i<s.length;i++)t.indexOf(s[i])<0&&Object.prototype.propertyIsEnumerable.call(e,s[i])&&(r[s[i]]=e[s[i]])}return r}(e,["action_link","email_otp","hashed_token","redirect_to","verification_type"]);return{data:{properties:{action_link:t,email_otp:r,hashed_token:s,redirect_to:i,verification_type:n},user:Object.assign({},o)},error:null}}function re(e){return e}class se{constructor({url:e="",headers:t={},fetch:r}){this.url=e,this.headers=t,this.fetch=D(r),this.mfa={listFactors:this._listFactors.bind(this),deleteFactor:this._deleteFactor.bind(this)}}async signOut(e,t="global"){try{return await Y(this.fetch,"POST",`${this.url}/logout?scope=${t}`,{headers:this.headers,jwt:e,noResolveJson:!0}),{data:null,error:null}}catch(e){if(h(e))return{data:null,error:e};throw e}}async inviteUserByEmail(e,t={}){try{return await Y(this.fetch,"POST",`${this.url}/invite`,{body:{email:e,data:t.data},headers:this.headers,redirectTo:t.redirectTo,xform:Z})}catch(e){if(h(e))return{data:{user:null},error:e};throw e}}async generateLink(e){try{const{options:t}=e,r=function(e,t){var r={};for(var s in e)Object.prototype.hasOwnProperty.call(e,s)&&t.indexOf(s)<0&&(r[s]=e[s]);if(null!=e&&"function"==typeof Object.getOwnPropertySymbols){var i=0;for(s=Object.getOwnPropertySymbols(e);i<s.length;i++)t.indexOf(s[i])<0&&Object.prototype.propertyIsEnumerable.call(e,s[i])&&(r[s[i]]=e[s[i]])}return r}(e,["options"]),s=Object.assign(Object.assign({},r),t);return"newEmail"in r&&(s.new_email=null==r?void 0:r.newEmail,delete s.newEmail),await Y(this.fetch,"POST",`${this.url}/admin/generate_link`,{body:s,headers:this.headers,xform:te,redirectTo:null==t?void 0:t.redirectTo})}catch(e){if(h(e))return{data:{properties:null,user:null},error:e};throw e}}async createUser(e){try{return await Y(this.fetch,"POST",`${this.url}/admin/users`,{body:e,headers:this.headers,xform:Z})}catch(e){if(h(e))return{data:{user:null},error:e};throw e}}async listUsers(e){var t,r,s,i,n,o,a;try{const c={nextPage:null,lastPage:0,total:0},l=await Y(this.fetch,"GET",`${this.url}/admin/users`,{headers:this.headers,noResolveJson:!0,query:{page:null!==(r=null===(t=null==e?void 0:e.page)||void 0===t?void 0:t.toString())&&void 0!==r?r:"",per_page:null!==(i=null===(s=null==e?void 0:e.perPage)||void 0===s?void 0:s.toString())&&void 0!==i?i:""},xform:re});if(l.error)throw l.error;const h=await l.json(),u=null!==(n=l.headers.get("x-total-count"))&&void 0!==n?n:0,d=null!==(a=null===(o=l.headers.get("link"))||void 0===o?void 0:o.split(","))&&void 0!==a?a:[];return d.length>0&&(d.forEach((e=>{const t=parseInt(e.split(";")[0].split("=")[1].substring(0,1)),r=JSON.parse(e.split(";")[1].split("=")[1]);c[`${r}Page`]=t})),c.total=parseInt(u)),{data:Object.assign(Object.assign({},h),c),error:null}}catch(e){if(h(e))return{data:{users:[]},error:e};throw e}}async getUserById(e){try{return await Y(this.fetch,"GET",`${this.url}/admin/users/${e}`,{headers:this.headers,xform:Z})}catch(e){if(h(e))return{data:{user:null},error:e};throw e}}async updateUserById(e,t){try{return await Y(this.fetch,"PUT",`${this.url}/admin/users/${e}`,{body:t,headers:this.headers,xform:Z})}catch(e){if(h(e))return{data:{user:null},error:e};throw e}}async deleteUser(e,t=!1){try{return await Y(this.fetch,"DELETE",`${this.url}/admin/users/${e}`,{headers:this.headers,body:{should_soft_delete:t},xform:Z})}catch(e){if(h(e))return{data:{user:null},error:e};throw e}}async _listFactors(e){try{const{data:t,error:r}=await Y(this.fetch,"GET",`${this.url}/admin/users/${e.userId}/factors`,{headers:this.headers,xform:e=>({data:{factors:e},error:null})});return{data:t,error:r}}catch(e){if(h(e))return{data:null,error:e};throw e}}async _deleteFactor(e){try{return{data:await Y(this.fetch,"DELETE",`${this.url}/admin/users/${e.userId}/factors/${e.id}`,{headers:this.headers}),error:null}}catch(e){if(h(e))return{data:null,error:e};throw e}}}const ie={getItem:e=>U()?globalThis.localStorage.getItem(e):null,setItem:(e,t)=>{U()&&globalThis.localStorage.setItem(e,t)},removeItem:e=>{U()&&globalThis.localStorage.removeItem(e)}};function ne(e={}){return{getItem:t=>e[t]||null,setItem:(t,r)=>{e[t]=r},removeItem:t=>{delete e[t]}}}const oe={debug:!!(globalThis&&U()&&globalThis.localStorage&&"true"===globalThis.localStorage.getItem("supabase.gotrue-js.locks.debug"))};class ae extends Error{constructor(e){super(e),this.isAcquireTimeout=!0}}class ce extends ae{}async function le(e,t,r){oe.debug&&console.log("@supabase/gotrue-js: navigatorLock: acquire lock",e,t);const s=new globalThis.AbortController;return t>0&&setTimeout((()=>{s.abort(),oe.debug&&console.log("@supabase/gotrue-js: navigatorLock acquire timed out",e)}),t),await Promise.resolve().then((()=>globalThis.navigator.locks.request(e,0===t?{mode:"exclusive",ifAvailable:!0}:{mode:"exclusive",signal:s.signal},(async s=>{if(!s){if(0===t)throw oe.debug&&console.log("@supabase/gotrue-js: navigatorLock: not immediately available",e),new ce(`Acquiring an exclusive Navigator LockManager lock "${e}" immediately failed`);if(oe.debug)try{const e=await globalThis.navigator.locks.query();console.log("@supabase/gotrue-js: Navigator LockManager state",JSON.stringify(e,null,"  "))}catch(e){console.warn("@supabase/gotrue-js: Error when querying Navigator LockManager state",e)}return console.warn("@supabase/gotrue-js: Navigator LockManager returned a null lock when using #request without ifAvailable set to true, it appears this browser is not following the LockManager spec https://developer.mozilla.org/en-US/docs/Web/API/LockManager/request"),await r()}oe.debug&&console.log("@supabase/gotrue-js: navigatorLock: acquired",e,s.name);try{return await r()}finally{oe.debug&&console.log("@supabase/gotrue-js: navigatorLock: released",e,s.name)}}))))}!function(){if("object"!=typeof globalThis)try{Object.defineProperty(Object.prototype,"__magic__",{get:function(){return this},configurable:!0}),__magic__.globalThis=__magic__,delete Object.prototype.__magic__}catch(e){"undefined"!=typeof self&&(self.globalThis=self)}}();const he={url:"http://localhost:9999",storageKey:"supabase.auth.token",autoRefreshToken:!0,persistSession:!0,detectSessionInUrl:!0,headers:n,flowType:"implicit",debug:!1,hasCustomAuthorizationHeader:!1};async function ue(e,t,r){return await r()}class de{constructor(e){var t,r;this.memoryStorage=null,this.stateChangeEmitters=new Map,this.autoRefreshTicker=null,this.visibilityChangedCallback=null,this.refreshingDeferred=null,this.initializePromise=null,this.detectSessionInUrl=!0,this.hasCustomAuthorizationHeader=!1,this.suppressGetSessionWarning=!1,this.lockAcquired=!1,this.pendingInLock=[],this.broadcastChannel=null,this.logger=console.log,this.instanceID=de.nextInstanceID,de.nextInstanceID+=1,this.instanceID>0&&I()&&console.warn("Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.");const s=Object.assign(Object.assign({},he),e);if(this.logDebugMessages=!!s.debug,"function"==typeof s.debug&&(this.logger=s.debug),this.persistSession=s.persistSession,this.storageKey=s.storageKey,this.autoRefreshToken=s.autoRefreshToken,this.admin=new se({url:s.url,headers:s.headers,fetch:s.fetch}),this.url=s.url,this.headers=s.headers,this.fetch=D(s.fetch),this.lock=s.lock||ue,this.detectSessionInUrl=s.detectSessionInUrl,this.flowType=s.flowType,this.hasCustomAuthorizationHeader=s.hasCustomAuthorizationHeader,s.lock?this.lock=s.lock:I()&&(null===(t=null===globalThis||void 0===globalThis?void 0:globalThis.navigator)||void 0===t?void 0:t.locks)?this.lock=le:this.lock=ue,this.jwks={keys:[]},this.jwks_cached_at=Number.MIN_SAFE_INTEGER,this.mfa={verify:this._verify.bind(this),enroll:this._enroll.bind(this),unenroll:this._unenroll.bind(this),challenge:this._challenge.bind(this),listFactors:this._listFactors.bind(this),challengeAndVerify:this._challengeAndVerify.bind(this),getAuthenticatorAssuranceLevel:this._getAuthenticatorAssuranceLevel.bind(this)},this.persistSession?s.storage?this.storage=s.storage:U()?this.storage=ie:(this.memoryStorage={},this.storage=ne(this.memoryStorage)):(this.memoryStorage={},this.storage=ne(this.memoryStorage)),I()&&globalThis.BroadcastChannel&&this.persistSession&&this.storageKey){try{this.broadcastChannel=new globalThis.BroadcastChannel(this.storageKey)}catch(e){console.error("Failed to create a new BroadcastChannel, multi-tab state changes will not be available",e)}null===(r=this.broadcastChannel)||void 0===r||r.addEventListener("message",(async e=>{this._debug("received broadcast notification from other tab or client",e),await this._notifyAllSubscribers(e.data.event,e.data.session,!1)}))}this.initialize()}_debug(...e){return this.logDebugMessages&&this.logger(`GoTrueClient@${this.instanceID} (${s}) ${(new Date).toISOString()}`,...e),this}async initialize(){return this.initializePromise||(this.initializePromise=(async()=>await this._acquireLock(-1,(async()=>await this._initialize())))()),await this.initializePromise}async _initialize(){var e;try{const t=function(e){const t={},r=new URL(e);if(r.hash&&"#"===r.hash[0])try{new URLSearchParams(r.hash.substring(1)).forEach(((e,r)=>{t[r]=e}))}catch(e){}return r.searchParams.forEach(((e,r)=>{t[r]=e})),t}(window.location.href);let r="none";if(this._isImplicitGrantCallback(t)?r="implicit":await this._isPKCECallback(t)&&(r="pkce"),I()&&this.detectSessionInUrl&&"none"!==r){const{data:s,error:i}=await this._getSessionFromURL(t,r);if(i){if(this._debug("#_initialize()","error detecting session from URL",i),w(i)){const t=null===(e=i.details)||void 0===e?void 0:e.code;if("identity_already_exists"===t||"identity_not_found"===t||"single_identity_not_deletable"===t)return{error:i}}return await this._removeSession(),{error:i}}const{session:n,redirectType:o}=s;return this._debug("#_initialize()","detected session in URL",n,"redirect type",o),await this._saveSession(n),setTimeout((async()=>{"recovery"===o?await this._notifyAllSubscribers("PASSWORD_RECOVERY",n):await this._notifyAllSubscribers("SIGNED_IN",n)}),0),{error:null}}return await this._recoverAndRefresh(),{error:null}}catch(e){return h(e)?{error:e}:{error:new f("Unexpected error during initialization",e)}}finally{await this._handleVisibilityChange(),this._debug("#_initialize()","end")}}async signInAnonymously(e){var t,r,s;try{const i=await Y(this.fetch,"POST",`${this.url}/signup`,{headers:this.headers,body:{data:null!==(r=null===(t=null==e?void 0:e.options)||void 0===t?void 0:t.data)&&void 0!==r?r:{},gotrue_meta_security:{captcha_token:null===(s=null==e?void 0:e.options)||void 0===s?void 0:s.captchaToken}},xform:Q}),{data:n,error:o}=i;if(o||!n)return{data:{user:null,session:null},error:o};const a=n.session,c=n.user;return n.session&&(await this._saveSession(n.session),await this._notifyAllSubscribers("SIGNED_IN",a)),{data:{user:c,session:a},error:null}}catch(e){if(h(e))return{data:{user:null,session:null},error:e};throw e}}async signUp(e){var t,r,s;try{let i;if("email"in e){const{email:r,password:s,options:n}=e;let o=null,a=null;"pkce"===this.flowType&&([o,a]=await z(this.storage,this.storageKey)),i=await Y(this.fetch,"POST",`${this.url}/signup`,{headers:this.headers,redirectTo:null==n?void 0:n.emailRedirectTo,body:{email:r,password:s,data:null!==(t=null==n?void 0:n.data)&&void 0!==t?t:{},gotrue_meta_security:{captcha_token:null==n?void 0:n.captchaToken},code_challenge:o,code_challenge_method:a},xform:Q})}else{if(!("phone"in e))throw new m("You must provide either an email or phone number and a password");{const{phone:t,password:n,options:o}=e;i=await Y(this.fetch,"POST",`${this.url}/signup`,{headers:this.headers,body:{phone:t,password:n,data:null!==(r=null==o?void 0:o.data)&&void 0!==r?r:{},channel:null!==(s=null==o?void 0:o.channel)&&void 0!==s?s:"sms",gotrue_meta_security:{captcha_token:null==o?void 0:o.captchaToken}},xform:Q})}}const{data:n,error:o}=i;if(o||!n)return{data:{user:null,session:null},error:o};const a=n.session,c=n.user;return n.session&&(await this._saveSession(n.session),await this._notifyAllSubscribers("SIGNED_IN",a)),{data:{user:c,session:a},error:null}}catch(e){if(h(e))return{data:{user:null,session:null},error:e};throw e}}async signInWithPassword(e){try{let t;if("email"in e){const{email:r,password:s,options:i}=e;t=await Y(this.fetch,"POST",`${this.url}/token?grant_type=password`,{headers:this.headers,body:{email:r,password:s,gotrue_meta_security:{captcha_token:null==i?void 0:i.captchaToken}},xform:X})}else{if(!("phone"in e))throw new m("You must provide either an email or phone number and a password");{const{phone:r,password:s,options:i}=e;t=await Y(this.fetch,"POST",`${this.url}/token?grant_type=password`,{headers:this.headers,body:{phone:r,password:s,gotrue_meta_security:{captcha_token:null==i?void 0:i.captchaToken}},xform:X})}}const{data:r,error:s}=t;return s?{data:{user:null,session:null},error:s}:r&&r.session&&r.user?(r.session&&(await this._saveSession(r.session),await this._notifyAllSubscribers("SIGNED_IN",r.session)),{data:Object.assign({user:r.user,session:r.session},r.weak_password?{weakPassword:r.weak_password}:null),error:s}):{data:{user:null,session:null},error:new y}}catch(e){if(h(e))return{data:{user:null,session:null},error:e};throw e}}async signInWithOAuth(e){var t,r,s,i;return await this._handleProviderSignIn(e.provider,{redirectTo:null===(t=e.options)||void 0===t?void 0:t.redirectTo,scopes:null===(r=e.options)||void 0===r?void 0:r.scopes,queryParams:null===(s=e.options)||void 0===s?void 0:s.queryParams,skipBrowserRedirect:null===(i=e.options)||void 0===i?void 0:i.skipBrowserRedirect})}async exchangeCodeForSession(e){return await this.initializePromise,this._acquireLock(-1,(async()=>this._exchangeCodeForSession(e)))}async _exchangeCodeForSession(e){const t=await M(this.storage,`${this.storageKey}-code-verifier`),[r,s]=(null!=t?t:"").split("/");try{const{data:t,error:i}=await Y(this.fetch,"POST",`${this.url}/token?grant_type=pkce`,{headers:this.headers,body:{auth_code:e,code_verifier:r},xform:Q});if(await B(this.storage,`${this.storageKey}-code-verifier`),i)throw i;return t&&t.session&&t.user?(t.session&&(await this._saveSession(t.session),await this._notifyAllSubscribers("SIGNED_IN",t.session)),{data:Object.assign(Object.assign({},t),{redirectType:null!=s?s:null}),error:i}):{data:{user:null,session:null,redirectType:null},error:new y}}catch(e){if(h(e))return{data:{user:null,session:null,redirectType:null},error:e};throw e}}async signInWithIdToken(e){try{const{options:t,provider:r,token:s,access_token:i,nonce:n}=e,o=await Y(this.fetch,"POST",`${this.url}/token?grant_type=id_token`,{headers:this.headers,body:{provider:r,id_token:s,access_token:i,nonce:n,gotrue_meta_security:{captcha_token:null==t?void 0:t.captchaToken}},xform:Q}),{data:a,error:c}=o;return c?{data:{user:null,session:null},error:c}:a&&a.session&&a.user?(a.session&&(await this._saveSession(a.session),await this._notifyAllSubscribers("SIGNED_IN",a.session)),{data:a,error:c}):{data:{user:null,session:null},error:new y}}catch(e){if(h(e))return{data:{user:null,session:null},error:e};throw e}}async signInWithOtp(e){var t,r,s,i,n;try{if("email"in e){const{email:s,options:i}=e;let n=null,o=null;"pkce"===this.flowType&&([n,o]=await z(this.storage,this.storageKey));const{error:a}=await Y(this.fetch,"POST",`${this.url}/otp`,{headers:this.headers,body:{email:s,data:null!==(t=null==i?void 0:i.data)&&void 0!==t?t:{},create_user:null===(r=null==i?void 0:i.shouldCreateUser)||void 0===r||r,gotrue_meta_security:{captcha_token:null==i?void 0:i.captchaToken},code_challenge:n,code_challenge_method:o},redirectTo:null==i?void 0:i.emailRedirectTo});return{data:{user:null,session:null},error:a}}if("phone"in e){const{phone:t,options:r}=e,{data:o,error:a}=await Y(this.fetch,"POST",`${this.url}/otp`,{headers:this.headers,body:{phone:t,data:null!==(s=null==r?void 0:r.data)&&void 0!==s?s:{},create_user:null===(i=null==r?void 0:r.shouldCreateUser)||void 0===i||i,gotrue_meta_security:{captcha_token:null==r?void 0:r.captchaToken},channel:null!==(n=null==r?void 0:r.channel)&&void 0!==n?n:"sms"}});return{data:{user:null,session:null,messageId:null==o?void 0:o.message_id},error:a}}throw new m("You must provide either an email or phone number.")}catch(e){if(h(e))return{data:{user:null,session:null},error:e};throw e}}async verifyOtp(e){var t,r;try{let s,i;"options"in e&&(s=null===(t=e.options)||void 0===t?void 0:t.redirectTo,i=null===(r=e.options)||void 0===r?void 0:r.captchaToken);const{data:n,error:o}=await Y(this.fetch,"POST",`${this.url}/verify`,{headers:this.headers,body:Object.assign(Object.assign({},e),{gotrue_meta_security:{captcha_token:i}}),redirectTo:s,xform:Q});if(o)throw o;if(!n)throw new Error("An error occurred on token verification.");const a=n.session,c=n.user;return(null==a?void 0:a.access_token)&&(await this._saveSession(a),await this._notifyAllSubscribers("recovery"==e.type?"PASSWORD_RECOVERY":"SIGNED_IN",a)),{data:{user:c,session:a},error:null}}catch(e){if(h(e))return{data:{user:null,session:null},error:e};throw e}}async signInWithSSO(e){var t,r,s;try{let i=null,n=null;return"pkce"===this.flowType&&([i,n]=await z(this.storage,this.storageKey)),await Y(this.fetch,"POST",`${this.url}/sso`,{body:Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({},"providerId"in e?{provider_id:e.providerId}:null),"domain"in e?{domain:e.domain}:null),{redirect_to:null!==(r=null===(t=e.options)||void 0===t?void 0:t.redirectTo)&&void 0!==r?r:void 0}),(null===(s=null==e?void 0:e.options)||void 0===s?void 0:s.captchaToken)?{gotrue_meta_security:{captcha_token:e.options.captchaToken}}:null),{skip_http_redirect:!0,code_challenge:i,code_challenge_method:n}),headers:this.headers,xform:ee})}catch(e){if(h(e))return{data:null,error:e};throw e}}async reauthenticate(){return await this.initializePromise,await this._acquireLock(-1,(async()=>await this._reauthenticate()))}async _reauthenticate(){try{return await this._useSession((async e=>{const{data:{session:t},error:r}=e;if(r)throw r;if(!t)throw new g;const{error:s}=await Y(this.fetch,"GET",`${this.url}/reauthenticate`,{headers:this.headers,jwt:t.access_token});return{data:{user:null,session:null},error:s}}))}catch(e){if(h(e))return{data:{user:null,session:null},error:e};throw e}}async resend(e){try{const t=`${this.url}/resend`;if("email"in e){const{email:r,type:s,options:i}=e,{error:n}=await Y(this.fetch,"POST",t,{headers:this.headers,body:{email:r,type:s,gotrue_meta_security:{captcha_token:null==i?void 0:i.captchaToken}},redirectTo:null==i?void 0:i.emailRedirectTo});return{data:{user:null,session:null},error:n}}if("phone"in e){const{phone:r,type:s,options:i}=e,{data:n,error:o}=await Y(this.fetch,"POST",t,{headers:this.headers,body:{phone:r,type:s,gotrue_meta_security:{captcha_token:null==i?void 0:i.captchaToken}}});return{data:{user:null,session:null,messageId:null==n?void 0:n.message_id},error:o}}throw new m("You must provide either an email or phone number and a type")}catch(e){if(h(e))return{data:{user:null,session:null},error:e};throw e}}async getSession(){return await this.initializePromise,await this._acquireLock(-1,(async()=>this._useSession((async e=>e))))}async _acquireLock(e,t){this._debug("#_acquireLock","begin",e);try{if(this.lockAcquired){const e=this.pendingInLock.length?this.pendingInLock[this.pendingInLock.length-1]:Promise.resolve(),r=(async()=>(await e,await t()))();return this.pendingInLock.push((async()=>{try{await r}catch(e){}})()),r}return await this.lock(`lock:${this.storageKey}`,e,(async()=>{this._debug("#_acquireLock","lock acquired for storage key",this.storageKey);try{this.lockAcquired=!0;const e=t();for(this.pendingInLock.push((async()=>{try{await e}catch(e){}})()),await e;this.pendingInLock.length;){const e=[...this.pendingInLock];await Promise.all(e),this.pendingInLock.splice(0,e.length)}return await e}finally{this._debug("#_acquireLock","lock released for storage key",this.storageKey),this.lockAcquired=!1}}))}finally{this._debug("#_acquireLock","end")}}async _useSession(e){this._debug("#_useSession","begin");try{const t=await this.__loadSession();return await e(t)}finally{this._debug("#_useSession","end")}}async __loadSession(){this._debug("#__loadSession()","begin"),this.lockAcquired||this._debug("#__loadSession()","used outside of an acquired lock!",(new Error).stack);try{let e=null;const t=await M(this.storage,this.storageKey);if(this._debug("#getSession()","session from storage",t),null!==t&&(this._isValidSession(t)?e=t:(this._debug("#getSession()","session from storage is not valid"),await this._removeSession())),!e)return{data:{session:null},error:null};const r=!!e.expires_at&&1e3*e.expires_at-Date.now()<9e4;if(this._debug("#__loadSession()",`session has${r?"":" not"} expired`,"expires_at",e.expires_at),!r){if(this.storage.isServer){let t=this.suppressGetSessionWarning;e=new Proxy(e,{get:(e,r,s)=>(t||"user"!==r||(console.warn("Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server."),t=!0,this.suppressGetSessionWarning=!0),Reflect.get(e,r,s))})}return{data:{session:e},error:null}}const{session:s,error:i}=await this._callRefreshToken(e.refresh_token);return i?{data:{session:null},error:i}:{data:{session:s},error:null}}finally{this._debug("#__loadSession()","end")}}async getUser(e){return e?await this._getUser(e):(await this.initializePromise,await this._acquireLock(-1,(async()=>await this._getUser())))}async _getUser(e){try{return e?await Y(this.fetch,"GET",`${this.url}/user`,{headers:this.headers,jwt:e,xform:Z}):await this._useSession((async e=>{var t,r,s;const{data:i,error:n}=e;if(n)throw n;return(null===(t=i.session)||void 0===t?void 0:t.access_token)||this.hasCustomAuthorizationHeader?await Y(this.fetch,"GET",`${this.url}/user`,{headers:this.headers,jwt:null!==(s=null===(r=i.session)||void 0===r?void 0:r.access_token)&&void 0!==s?s:void 0,xform:Z}):{data:{user:null},error:new g}}))}catch(e){if(h(e))return v(e)&&(await this._removeSession(),await B(this.storage,`${this.storageKey}-code-verifier`)),{data:{user:null},error:e};throw e}}async updateUser(e,t={}){return await this.initializePromise,await this._acquireLock(-1,(async()=>await this._updateUser(e,t)))}async _updateUser(e,t={}){try{return await this._useSession((async r=>{const{data:s,error:i}=r;if(i)throw i;if(!s.session)throw new g;const n=s.session;let o=null,a=null;"pkce"===this.flowType&&null!=e.email&&([o,a]=await z(this.storage,this.storageKey));const{data:c,error:l}=await Y(this.fetch,"PUT",`${this.url}/user`,{headers:this.headers,redirectTo:null==t?void 0:t.emailRedirectTo,body:Object.assign(Object.assign({},e),{code_challenge:o,code_challenge_method:a}),jwt:n.access_token,xform:Z});if(l)throw l;return n.user=c.user,await this._saveSession(n),await this._notifyAllSubscribers("USER_UPDATED",n),{data:{user:n.user},error:null}}))}catch(e){if(h(e))return{data:{user:null},error:e};throw e}}async setSession(e){return await this.initializePromise,await this._acquireLock(-1,(async()=>await this._setSession(e)))}async _setSession(e){try{if(!e.access_token||!e.refresh_token)throw new g;const t=Date.now()/1e3;let r=t,s=!0,i=null;const{payload:n}=J(e.access_token);if(n.exp&&(r=n.exp,s=r<=t),s){const{session:t,error:r}=await this._callRefreshToken(e.refresh_token);if(r)return{data:{user:null,session:null},error:r};if(!t)return{data:{user:null,session:null},error:null};i=t}else{const{data:s,error:n}=await this._getUser(e.access_token);if(n)throw n;i={access_token:e.access_token,refresh_token:e.refresh_token,user:s.user,token_type:"bearer",expires_in:r-t,expires_at:r},await this._saveSession(i),await this._notifyAllSubscribers("SIGNED_IN",i)}return{data:{user:i.user,session:i},error:null}}catch(e){if(h(e))return{data:{session:null,user:null},error:e};throw e}}async refreshSession(e){return await this.initializePromise,await this._acquireLock(-1,(async()=>await this._refreshSession(e)))}async _refreshSession(e){try{return await this._useSession((async t=>{var r;if(!e){const{data:s,error:i}=t;if(i)throw i;e=null!==(r=s.session)&&void 0!==r?r:void 0}if(!(null==e?void 0:e.refresh_token))throw new g;const{session:s,error:i}=await this._callRefreshToken(e.refresh_token);return i?{data:{user:null,session:null},error:i}:s?{data:{user:s.user,session:s},error:null}:{data:{user:null,session:null},error:null}}))}catch(e){if(h(e))return{data:{user:null,session:null},error:e};throw e}}async _getSessionFromURL(e,t){try{if(!I())throw new _("No browser detected.");if(e.error||e.error_description||e.error_code)throw new _(e.error_description||"Error in URL with unspecified error_description",{error:e.error||"unspecified_error",code:e.error_code||"unspecified_code"});switch(t){case"implicit":if("pkce"===this.flowType)throw new b("Not a valid PKCE flow url.");break;case"pkce":if("implicit"===this.flowType)throw new _("Not a valid implicit grant flow url.")}if("pkce"===t){if(this._debug("#_initialize()","begin","is PKCE flow",!0),!e.code)throw new b("No code detected.");const{data:t,error:r}=await this._exchangeCodeForSession(e.code);if(r)throw r;const s=new URL(window.location.href);return s.searchParams.delete("code"),window.history.replaceState(window.history.state,"",s.toString()),{data:{session:t.session,redirectType:null},error:null}}const{provider_token:r,provider_refresh_token:s,access_token:n,refresh_token:o,expires_in:a,expires_at:c,token_type:l}=e;if(!(n&&a&&o&&l))throw new _("No session defined in URL");const h=Math.round(Date.now()/1e3),u=parseInt(a);let d=h+u;c&&(d=parseInt(c));const f=d-h;1e3*f<=i&&console.warn(`@supabase/gotrue-js: Session as retrieved from URL expires in ${f}s, should have been closer to ${u}s`);const p=d-u;h-p>=120?console.warn("@supabase/gotrue-js: Session as retrieved from URL was issued over 120s ago, URL could be stale",p,d,h):h-p<0&&console.warn("@supabase/gotrue-js: Session as retrieved from URL was issued in the future? Check the device clock for skew",p,d,h);const{data:g,error:v}=await this._getUser(n);if(v)throw v;const y={provider_token:r,provider_refresh_token:s,access_token:n,expires_in:u,expires_at:d,refresh_token:o,token_type:l,user:g.user};return window.location.hash="",this._debug("#_getSessionFromURL()","clearing window.location.hash"),{data:{session:y,redirectType:e.type},error:null}}catch(e){if(h(e))return{data:{session:null,redirectType:null},error:e};throw e}}_isImplicitGrantCallback(e){return Boolean(e.access_token||e.error_description)}async _isPKCECallback(e){const t=await M(this.storage,`${this.storageKey}-code-verifier`);return!(!e.code||!t)}async signOut(e={scope:"global"}){return await this.initializePromise,await this._acquireLock(-1,(async()=>await this._signOut(e)))}async _signOut({scope:e}={scope:"global"}){return await this._useSession((async t=>{var r;const{data:s,error:i}=t;if(i)return{error:i};const n=null===(r=s.session)||void 0===r?void 0:r.access_token;if(n){const{error:t}=await this.admin.signOut(n,e);if(t&&(!d(t)||404!==t.status&&401!==t.status&&403!==t.status))return{error:t}}return"others"!==e&&(await this._removeSession(),await B(this.storage,`${this.storageKey}-code-verifier`)),{error:null}}))}onAuthStateChange(e){const t="xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,(function(e){const t=16*Math.random()|0;return("x"==e?t:3&t|8).toString(16)})),r={id:t,callback:e,unsubscribe:()=>{this._debug("#unsubscribe()","state change callback with id removed",t),this.stateChangeEmitters.delete(t)}};return this._debug("#onAuthStateChange()","registered callback with id",t),this.stateChangeEmitters.set(t,r),(async()=>{await this.initializePromise,await this._acquireLock(-1,(async()=>{this._emitInitialSession(t)}))})(),{data:{subscription:r}}}async _emitInitialSession(e){return await this._useSession((async t=>{var r,s;try{const{data:{session:s},error:i}=t;if(i)throw i;await(null===(r=this.stateChangeEmitters.get(e))||void 0===r?void 0:r.callback("INITIAL_SESSION",s)),this._debug("INITIAL_SESSION","callback id",e,"session",s)}catch(t){await(null===(s=this.stateChangeEmitters.get(e))||void 0===s?void 0:s.callback("INITIAL_SESSION",null)),this._debug("INITIAL_SESSION","callback id",e,"error",t),console.error(t)}}))}async resetPasswordForEmail(e,t={}){let r=null,s=null;"pkce"===this.flowType&&([r,s]=await z(this.storage,this.storageKey,!0));try{return await Y(this.fetch,"POST",`${this.url}/recover`,{body:{email:e,code_challenge:r,code_challenge_method:s,gotrue_meta_security:{captcha_token:t.captchaToken}},headers:this.headers,redirectTo:t.redirectTo})}catch(e){if(h(e))return{data:null,error:e};throw e}}async getUserIdentities(){var e;try{const{data:t,error:r}=await this.getUser();if(r)throw r;return{data:{identities:null!==(e=t.user.identities)&&void 0!==e?e:[]},error:null}}catch(e){if(h(e))return{data:null,error:e};throw e}}async linkIdentity(e){var t;try{const{data:r,error:s}=await this._useSession((async t=>{var r,s,i,n,o;const{data:a,error:c}=t;if(c)throw c;const l=await this._getUrlForProvider(`${this.url}/user/identities/authorize`,e.provider,{redirectTo:null===(r=e.options)||void 0===r?void 0:r.redirectTo,scopes:null===(s=e.options)||void 0===s?void 0:s.scopes,queryParams:null===(i=e.options)||void 0===i?void 0:i.queryParams,skipBrowserRedirect:!0});return await Y(this.fetch,"GET",l,{headers:this.headers,jwt:null!==(o=null===(n=a.session)||void 0===n?void 0:n.access_token)&&void 0!==o?o:void 0})}));if(s)throw s;return I()&&!(null===(t=e.options)||void 0===t?void 0:t.skipBrowserRedirect)&&window.location.assign(null==r?void 0:r.url),{data:{provider:e.provider,url:null==r?void 0:r.url},error:null}}catch(t){if(h(t))return{data:{provider:e.provider,url:null},error:t};throw t}}async unlinkIdentity(e){try{return await this._useSession((async t=>{var r,s;const{data:i,error:n}=t;if(n)throw n;return await Y(this.fetch,"DELETE",`${this.url}/user/identities/${e.identity_id}`,{headers:this.headers,jwt:null!==(s=null===(r=i.session)||void 0===r?void 0:r.access_token)&&void 0!==s?s:void 0})}))}catch(e){if(h(e))return{data:null,error:e};throw e}}async _refreshAccessToken(e){const t=`#_refreshAccessToken(${e.substring(0,5)}...)`;this._debug(t,"begin");try{const n=Date.now();return await(r=async r=>(r>0&&await async function(e){return await new Promise((t=>{setTimeout((()=>t(null)),e)}))}(200*Math.pow(2,r-1)),this._debug(t,"refreshing attempt",r),await Y(this.fetch,"POST",`${this.url}/token?grant_type=refresh_token`,{body:{refresh_token:e},headers:this.headers,xform:Q})),s=(e,t)=>{const r=200*Math.pow(2,e);return t&&T(t)&&Date.now()+r-n<i},new Promise(((e,t)=>{(async()=>{for(let i=0;i<1/0;i++)try{const t=await r(i);if(!s(i,null))return void e(t)}catch(e){if(!s(i,e))return void t(e)}})()})))}catch(e){if(this._debug(t,"error",e),h(e))return{data:{session:null,user:null},error:e};throw e}finally{this._debug(t,"end")}var r,s}_isValidSession(e){return"object"==typeof e&&null!==e&&"access_token"in e&&"refresh_token"in e&&"expires_at"in e}async _handleProviderSignIn(e,t){const r=await this._getUrlForProvider(`${this.url}/authorize`,e,{redirectTo:t.redirectTo,scopes:t.scopes,queryParams:t.queryParams});return this._debug("#_handleProviderSignIn()","provider",e,"options",t,"url",r),I()&&!t.skipBrowserRedirect&&window.location.assign(r),{data:{provider:e,url:r},error:null}}async _recoverAndRefresh(){var e;const t="#_recoverAndRefresh()";this._debug(t,"begin");try{const r=await M(this.storage,this.storageKey);if(this._debug(t,"session from storage",r),!this._isValidSession(r))return this._debug(t,"session is not valid"),void(null!==r&&await this._removeSession());const s=1e3*(null!==(e=r.expires_at)&&void 0!==e?e:1/0)-Date.now()<9e4;if(this._debug(t,`session has${s?"":" not"} expired with margin of 90000s`),s){if(this.autoRefreshToken&&r.refresh_token){const{error:e}=await this._callRefreshToken(r.refresh_token);e&&(console.error(e),T(e)||(this._debug(t,"refresh failed with a non-retryable error, removing the session",e),await this._removeSession()))}}else await this._notifyAllSubscribers("SIGNED_IN",r)}catch(e){return this._debug(t,"error",e),void console.error(e)}finally{this._debug(t,"end")}}async _callRefreshToken(e){var t,r;if(!e)throw new g;if(this.refreshingDeferred)return this.refreshingDeferred.promise;const s=`#_callRefreshToken(${e.substring(0,5)}...)`;this._debug(s,"begin");try{this.refreshingDeferred=new q;const{data:t,error:r}=await this._refreshAccessToken(e);if(r)throw r;if(!t.session)throw new g;await this._saveSession(t.session),await this._notifyAllSubscribers("TOKEN_REFRESHED",t.session);const s={session:t.session,error:null};return this.refreshingDeferred.resolve(s),s}catch(e){if(this._debug(s,"error",e),h(e)){const r={session:null,error:e};return T(e)||await this._removeSession(),null===(t=this.refreshingDeferred)||void 0===t||t.resolve(r),r}throw null===(r=this.refreshingDeferred)||void 0===r||r.reject(e),e}finally{this.refreshingDeferred=null,this._debug(s,"end")}}async _notifyAllSubscribers(e,t,r=!0){const s=`#_notifyAllSubscribers(${e})`;this._debug(s,"begin",t,`broadcast = ${r}`);try{this.broadcastChannel&&r&&this.broadcastChannel.postMessage({event:e,session:t});const s=[],i=Array.from(this.stateChangeEmitters.values()).map((async r=>{try{await r.callback(e,t)}catch(e){s.push(e)}}));if(await Promise.all(i),s.length>0){for(let e=0;e<s.length;e+=1)console.error(s[e]);throw s[0]}}finally{this._debug(s,"end")}}async _saveSession(e){this._debug("#_saveSession()",e),this.suppressGetSessionWarning=!0,await F(this.storage,this.storageKey,e)}async _removeSession(){this._debug("#_removeSession()"),await B(this.storage,this.storageKey),await this._notifyAllSubscribers("SIGNED_OUT",null)}_removeVisibilityChangedCallback(){this._debug("#_removeVisibilityChangedCallback()");const e=this.visibilityChangedCallback;this.visibilityChangedCallback=null;try{e&&I()&&(null===window||void 0===window?void 0:window.removeEventListener)&&window.removeEventListener("visibilitychange",e)}catch(e){console.error("removing visibilitychange callback failed",e)}}async _startAutoRefresh(){await this._stopAutoRefresh(),this._debug("#_startAutoRefresh()");const e=setInterval((()=>this._autoRefreshTokenTick()),i);this.autoRefreshTicker=e,e&&"object"==typeof e&&"function"==typeof e.unref?e.unref():"undefined"!=typeof Deno&&"function"==typeof Deno.unrefTimer&&Deno.unrefTimer(e),setTimeout((async()=>{await this.initializePromise,await this._autoRefreshTokenTick()}),0)}async _stopAutoRefresh(){this._debug("#_stopAutoRefresh()");const e=this.autoRefreshTicker;this.autoRefreshTicker=null,e&&clearInterval(e)}async startAutoRefresh(){this._removeVisibilityChangedCallback(),await this._startAutoRefresh()}async stopAutoRefresh(){this._removeVisibilityChangedCallback(),await this._stopAutoRefresh()}async _autoRefreshTokenTick(){this._debug("#_autoRefreshTokenTick()","begin");try{await this._acquireLock(0,(async()=>{try{const e=Date.now();try{return await this._useSession((async t=>{const{data:{session:r}}=t;if(!r||!r.refresh_token||!r.expires_at)return void this._debug("#_autoRefreshTokenTick()","no session");const s=Math.floor((1e3*r.expires_at-e)/i);this._debug("#_autoRefreshTokenTick()",`access token expires in ${s} ticks, a tick lasts 30000ms, refresh threshold is 3 ticks`),s<=3&&await this._callRefreshToken(r.refresh_token)}))}catch(e){console.error("Auto refresh tick failed with error. This is likely a transient error.",e)}}finally{this._debug("#_autoRefreshTokenTick()","end")}}))}catch(e){if(!(e.isAcquireTimeout||e instanceof ae))throw e;this._debug("auto refresh token tick lock not available")}}async _handleVisibilityChange(){if(this._debug("#_handleVisibilityChange()"),!I()||!(null===window||void 0===window?void 0:window.addEventListener))return this.autoRefreshToken&&this.startAutoRefresh(),!1;try{this.visibilityChangedCallback=async()=>await this._onVisibilityChanged(!1),null===window||void 0===window||window.addEventListener("visibilitychange",this.visibilityChangedCallback),await this._onVisibilityChanged(!0)}catch(e){console.error("_handleVisibilityChange",e)}}async _onVisibilityChanged(e){const t=`#_onVisibilityChanged(${e})`;this._debug(t,"visibilityState",document.visibilityState),"visible"===document.visibilityState?(this.autoRefreshToken&&this._startAutoRefresh(),e||(await this.initializePromise,await this._acquireLock(-1,(async()=>{"visible"===document.visibilityState?await this._recoverAndRefresh():this._debug(t,"acquired the lock to recover the session, but the browser visibilityState is no longer visible, aborting")})))):"hidden"===document.visibilityState&&this.autoRefreshToken&&this._stopAutoRefresh()}async _getUrlForProvider(e,t,r){const s=[`provider=${encodeURIComponent(t)}`];if((null==r?void 0:r.redirectTo)&&s.push(`redirect_to=${encodeURIComponent(r.redirectTo)}`),(null==r?void 0:r.scopes)&&s.push(`scopes=${encodeURIComponent(r.scopes)}`),"pkce"===this.flowType){const[e,t]=await z(this.storage,this.storageKey),r=new URLSearchParams({code_challenge:`${encodeURIComponent(e)}`,code_challenge_method:`${encodeURIComponent(t)}`});s.push(r.toString())}if(null==r?void 0:r.queryParams){const e=new URLSearchParams(r.queryParams);s.push(e.toString())}return(null==r?void 0:r.skipBrowserRedirect)&&s.push(`skip_http_redirect=${r.skipBrowserRedirect}`),`${e}?${s.join("&")}`}async _unenroll(e){try{return await this._useSession((async t=>{var r;const{data:s,error:i}=t;return i?{data:null,error:i}:await Y(this.fetch,"DELETE",`${this.url}/factors/${e.factorId}`,{headers:this.headers,jwt:null===(r=null==s?void 0:s.session)||void 0===r?void 0:r.access_token})}))}catch(e){if(h(e))return{data:null,error:e};throw e}}async _enroll(e){try{return await this._useSession((async t=>{var r,s;const{data:i,error:n}=t;if(n)return{data:null,error:n};const o=Object.assign({friendly_name:e.friendlyName,factor_type:e.factorType},"phone"===e.factorType?{phone:e.phone}:{issuer:e.issuer}),{data:a,error:c}=await Y(this.fetch,"POST",`${this.url}/factors`,{body:o,headers:this.headers,jwt:null===(r=null==i?void 0:i.session)||void 0===r?void 0:r.access_token});return c?{data:null,error:c}:("totp"===e.factorType&&(null===(s=null==a?void 0:a.totp)||void 0===s?void 0:s.qr_code)&&(a.totp.qr_code=`data:image/svg+xml;utf-8,${a.totp.qr_code}`),{data:a,error:null})}))}catch(e){if(h(e))return{data:null,error:e};throw e}}async _verify(e){return this._acquireLock(-1,(async()=>{try{return await this._useSession((async t=>{var r;const{data:s,error:i}=t;if(i)return{data:null,error:i};const{data:n,error:o}=await Y(this.fetch,"POST",`${this.url}/factors/${e.factorId}/verify`,{body:{code:e.code,challenge_id:e.challengeId},headers:this.headers,jwt:null===(r=null==s?void 0:s.session)||void 0===r?void 0:r.access_token});return o?{data:null,error:o}:(await this._saveSession(Object.assign({expires_at:Math.round(Date.now()/1e3)+n.expires_in},n)),await this._notifyAllSubscribers("MFA_CHALLENGE_VERIFIED",n),{data:n,error:o})}))}catch(e){if(h(e))return{data:null,error:e};throw e}}))}async _challenge(e){return this._acquireLock(-1,(async()=>{try{return await this._useSession((async t=>{var r;const{data:s,error:i}=t;return i?{data:null,error:i}:await Y(this.fetch,"POST",`${this.url}/factors/${e.factorId}/challenge`,{body:{channel:e.channel},headers:this.headers,jwt:null===(r=null==s?void 0:s.session)||void 0===r?void 0:r.access_token})}))}catch(e){if(h(e))return{data:null,error:e};throw e}}))}async _challengeAndVerify(e){const{data:t,error:r}=await this._challenge({factorId:e.factorId});return r?{data:null,error:r}:await this._verify({factorId:e.factorId,challengeId:t.id,code:e.code})}async _listFactors(){const{data:{user:e},error:t}=await this.getUser();if(t)return{data:null,error:t};const r=(null==e?void 0:e.factors)||[],s=r.filter((e=>"totp"===e.factor_type&&"verified"===e.status)),i=r.filter((e=>"phone"===e.factor_type&&"verified"===e.status));return{data:{all:r,totp:s,phone:i},error:null}}async _getAuthenticatorAssuranceLevel(){return this._acquireLock(-1,(async()=>await this._useSession((async e=>{var t,r;const{data:{session:s},error:i}=e;if(i)return{data:null,error:i};if(!s)return{data:{currentLevel:null,nextLevel:null,currentAuthenticationMethods:[]},error:null};const{payload:n}=J(s.access_token);let o=null;n.aal&&(o=n.aal);let a=o;return(null!==(r=null===(t=s.user.factors)||void 0===t?void 0:t.filter((e=>"verified"===e.status)))&&void 0!==r?r:[]).length>0&&(a="aal2"),{data:{currentLevel:o,nextLevel:a,currentAuthenticationMethods:n.amr||[]},error:null}}))))}async fetchJwk(e,t={keys:[]}){let r=t.keys.find((t=>t.kid===e));if(r)return r;if(r=this.jwks.keys.find((t=>t.kid===e)),r&&this.jwks_cached_at+6e5>Date.now())return r;const{data:s,error:i}=await Y(this.fetch,"GET",`${this.url}/.well-known/jwks.json`,{headers:this.headers});if(i)throw i;if(!s.keys||0===s.keys.length)throw new j("JWKS is empty");if(this.jwks=s,this.jwks_cached_at=Date.now(),r=s.keys.find((t=>t.kid===e)),!r)throw new j("No matching signing key found in JWKS");return r}async getClaims(e,t={keys:[]}){try{let r=e;if(!r){const{data:e,error:t}=await this.getSession();if(t||!e.session)return{data:null,error:t};r=e.session.access_token}const{header:s,payload:i,signature:n,raw:{header:o,payload:a}}=J(r);if(function(e){if(!e)throw new Error("Missing exp claim");if(e<=Math.floor(Date.now()/1e3))throw new Error("JWT has expired")}(i.exp),!s.kid||"HS256"===s.alg||!("crypto"in globalThis)||!("subtle"in globalThis.crypto)){const{error:e}=await this.getUser(r);if(e)throw e;return{data:{claims:i,header:s,signature:n},error:null}}const c=function(e){switch(e){case"RS256":return{name:"RSASSA-PKCS1-v1_5",hash:{name:"SHA-256"}};case"ES256":return{name:"ECDSA",namedCurve:"P-256",hash:{name:"SHA-256"}};default:throw new Error("Invalid alg claim")}}(s.alg),l=await this.fetchJwk(s.kid,t),h=await crypto.subtle.importKey("jwk",l,c,!0,["verify"]);if(!await crypto.subtle.verify(c,h,n,function(e){const t=[];return function(e,t){for(let r=0;r<e.length;r+=1){let s=e.charCodeAt(r);if(s>55295&&s<=56319){const t=1024*(s-55296)&65535;s=65536+(e.charCodeAt(r+1)-56320&65535|t),r+=1}x(s,t)}}(e,(e=>t.push(e))),new Uint8Array(t)}(`${o}.${a}`)))throw new j("Invalid JWT signature");return{data:{claims:i,header:s,signature:n},error:null}}catch(e){if(h(e))return{data:null,error:e};throw e}}}de.nextInstanceID=0;const fe=se,pe=de},227:(e,t,r)=>{r.r(t),r.d(t,{FunctionRegion:()=>a,FunctionsClient:()=>c,FunctionsError:()=>s,FunctionsFetchError:()=>i,FunctionsHttpError:()=>o,FunctionsRelayError:()=>n});class s extends Error{constructor(e,t="FunctionsError",r){super(e),this.name=t,this.context=r}}class i extends s{constructor(e){super("Failed to send a request to the Edge Function","FunctionsFetchError",e)}}class n extends s{constructor(e){super("Relay Error invoking the Edge Function","FunctionsRelayError",e)}}class o extends s{constructor(e){super("Edge Function returned a non-2xx status code","FunctionsHttpError",e)}}var a;!function(e){e.Any="any",e.ApNortheast1="ap-northeast-1",e.ApNortheast2="ap-northeast-2",e.ApSouth1="ap-south-1",e.ApSoutheast1="ap-southeast-1",e.ApSoutheast2="ap-southeast-2",e.CaCentral1="ca-central-1",e.EuCentral1="eu-central-1",e.EuWest1="eu-west-1",e.EuWest2="eu-west-2",e.EuWest3="eu-west-3",e.SaEast1="sa-east-1",e.UsEast1="us-east-1",e.UsWest1="us-west-1",e.UsWest2="us-west-2"}(a||(a={}));class c{constructor(e,{headers:t={},customFetch:s,region:i=a.Any}={}){this.url=e,this.headers=t,this.region=i,this.fetch=(e=>{let t;return t=e||("undefined"==typeof fetch?(...e)=>Promise.resolve().then(r.bind(r,907)).then((({default:t})=>t(...e))):fetch),(...e)=>t(...e)})(s)}setAuth(e){this.headers.Authorization=`Bearer ${e}`}invoke(e,t={}){var r,s,a,c,l;return s=this,a=void 0,l=function*(){try{const{headers:s,method:a,body:c}=t;let l,h={},{region:u}=t;u||(u=this.region),u&&"any"!==u&&(h["x-region"]=u),c&&(s&&!Object.prototype.hasOwnProperty.call(s,"Content-Type")||!s)&&("undefined"!=typeof Blob&&c instanceof Blob||c instanceof ArrayBuffer?(h["Content-Type"]="application/octet-stream",l=c):"string"==typeof c?(h["Content-Type"]="text/plain",l=c):"undefined"!=typeof FormData&&c instanceof FormData?l=c:(h["Content-Type"]="application/json",l=JSON.stringify(c)));const d=yield this.fetch(`${this.url}/${e}`,{method:a||"POST",headers:Object.assign(Object.assign(Object.assign({},h),this.headers),s),body:l}).catch((e=>{throw new i(e)})),f=d.headers.get("x-relay-error");if(f&&"true"===f)throw new n(d);if(!d.ok)throw new o(d);let p,g=(null!==(r=d.headers.get("Content-Type"))&&void 0!==r?r:"text/plain").split(";")[0].trim();return p="application/json"===g?yield d.json():"application/octet-stream"===g?yield d.blob():"text/event-stream"===g?d:"multipart/form-data"===g?yield d.formData():yield d.text(),{data:p,error:null}}catch(e){return{data:null,error:e}}},new((c=void 0)||(c=Promise))((function(e,t){function r(e){try{n(l.next(e))}catch(e){t(e)}}function i(e){try{n(l.throw(e))}catch(e){t(e)}}function n(t){var s;t.done?e(t.value):(s=t.value,s instanceof c?s:new c((function(e){e(s)}))).then(r,i)}n((l=l.apply(s,a||[])).next())}))}}},907:(e,t,r)=>{r.r(t),r.d(t,{Headers:()=>o,Request:()=>a,Response:()=>c,default:()=>n,fetch:()=>i});var s=function(){if("undefined"!=typeof self)return self;if("undefined"!=typeof window)return window;if(void 0!==r.g)return r.g;throw new Error("unable to locate global object")}();const i=s.fetch,n=s.fetch.bind(s),o=s.Headers,a=s.Request,c=s.Response},660:function(e,t,r){var s=this&&this.__importDefault||function(e){return e&&e.__esModule?e:{default:e}};Object.defineProperty(t,"__esModule",{value:!0});const i=s(r(907)),n=s(r(818));t.default=class{constructor(e){this.shouldThrowOnError=!1,this.method=e.method,this.url=e.url,this.headers=e.headers,this.schema=e.schema,this.body=e.body,this.shouldThrowOnError=e.shouldThrowOnError,this.signal=e.signal,this.isMaybeSingle=e.isMaybeSingle,e.fetch?this.fetch=e.fetch:"undefined"==typeof fetch?this.fetch=i.default:this.fetch=fetch}throwOnError(){return this.shouldThrowOnError=!0,this}setHeader(e,t){return this.headers=Object.assign({},this.headers),this.headers[e]=t,this}then(e,t){void 0===this.schema||(["GET","HEAD"].includes(this.method)?this.headers["Accept-Profile"]=this.schema:this.headers["Content-Profile"]=this.schema),"GET"!==this.method&&"HEAD"!==this.method&&(this.headers["Content-Type"]="application/json");let r=(0,this.fetch)(this.url.toString(),{method:this.method,headers:this.headers,body:JSON.stringify(this.body),signal:this.signal}).then((async e=>{var t,r,s;let i=null,o=null,a=null,c=e.status,l=e.statusText;if(e.ok){if("HEAD"!==this.method){const t=await e.text();""===t||(o="text/csv"===this.headers.Accept||this.headers.Accept&&this.headers.Accept.includes("application/vnd.pgrst.plan+text")?t:JSON.parse(t))}const s=null===(t=this.headers.Prefer)||void 0===t?void 0:t.match(/count=(exact|planned|estimated)/),n=null===(r=e.headers.get("content-range"))||void 0===r?void 0:r.split("/");s&&n&&n.length>1&&(a=parseInt(n[1])),this.isMaybeSingle&&"GET"===this.method&&Array.isArray(o)&&(o.length>1?(i={code:"PGRST116",details:`Results contain ${o.length} rows, application/vnd.pgrst.object+json requires 1 row`,hint:null,message:"JSON object requested, multiple (or no) rows returned"},o=null,a=null,c=406,l="Not Acceptable"):o=1===o.length?o[0]:null)}else{const t=await e.text();try{i=JSON.parse(t),Array.isArray(i)&&404===e.status&&(o=[],i=null,c=200,l="OK")}catch(r){404===e.status&&""===t?(c=204,l="No Content"):i={message:t}}if(i&&this.isMaybeSingle&&(null===(s=null==i?void 0:i.details)||void 0===s?void 0:s.includes("0 rows"))&&(i=null,c=200,l="OK"),i&&this.shouldThrowOnError)throw new n.default(i)}return{error:i,data:o,count:a,status:c,statusText:l}}));return this.shouldThrowOnError||(r=r.catch((e=>{var t,r,s;return{error:{message:`${null!==(t=null==e?void 0:e.name)&&void 0!==t?t:"FetchError"}: ${null==e?void 0:e.message}`,details:`${null!==(r=null==e?void 0:e.stack)&&void 0!==r?r:""}`,hint:"",code:`${null!==(s=null==e?void 0:e.code)&&void 0!==s?s:""}`},data:null,count:null,status:0,statusText:""}}))),r.then(e,t)}returns(){return this}overrideTypes(){return this}}},961:function(e,t,r){var s=this&&this.__importDefault||function(e){return e&&e.__esModule?e:{default:e}};Object.defineProperty(t,"__esModule",{value:!0});const i=s(r(45)),n=s(r(825)),o=r(530);class a{constructor(e,{headers:t={},schema:r,fetch:s}={}){this.url=e,this.headers=Object.assign(Object.assign({},o.DEFAULT_HEADERS),t),this.schemaName=r,this.fetch=s}from(e){const t=new URL(`${this.url}/${e}`);return new i.default(t,{headers:Object.assign({},this.headers),schema:this.schemaName,fetch:this.fetch})}schema(e){return new a(this.url,{headers:this.headers,schema:e,fetch:this.fetch})}rpc(e,t={},{head:r=!1,get:s=!1,count:i}={}){let o;const a=new URL(`${this.url}/rpc/${e}`);let c;r||s?(o=r?"HEAD":"GET",Object.entries(t).filter((([e,t])=>void 0!==t)).map((([e,t])=>[e,Array.isArray(t)?`{${t.join(",")}}`:`${t}`])).forEach((([e,t])=>{a.searchParams.append(e,t)}))):(o="POST",c=t);const l=Object.assign({},this.headers);return i&&(l.Prefer=`count=${i}`),new n.default({method:o,url:a,headers:l,schema:this.schemaName,body:c,fetch:this.fetch,allowEmpty:!1})}}t.default=a},818:(e,t)=>{Object.defineProperty(t,"__esModule",{value:!0});class r extends Error{constructor(e){super(e.message),this.name="PostgrestError",this.details=e.details,this.hint=e.hint,this.code=e.code}}t.default=r},825:function(e,t,r){var s=this&&this.__importDefault||function(e){return e&&e.__esModule?e:{default:e}};Object.defineProperty(t,"__esModule",{value:!0});const i=s(r(261));class n extends i.default{eq(e,t){return this.url.searchParams.append(e,`eq.${t}`),this}neq(e,t){return this.url.searchParams.append(e,`neq.${t}`),this}gt(e,t){return this.url.searchParams.append(e,`gt.${t}`),this}gte(e,t){return this.url.searchParams.append(e,`gte.${t}`),this}lt(e,t){return this.url.searchParams.append(e,`lt.${t}`),this}lte(e,t){return this.url.searchParams.append(e,`lte.${t}`),this}like(e,t){return this.url.searchParams.append(e,`like.${t}`),this}likeAllOf(e,t){return this.url.searchParams.append(e,`like(all).{${t.join(",")}}`),this}likeAnyOf(e,t){return this.url.searchParams.append(e,`like(any).{${t.join(",")}}`),this}ilike(e,t){return this.url.searchParams.append(e,`ilike.${t}`),this}ilikeAllOf(e,t){return this.url.searchParams.append(e,`ilike(all).{${t.join(",")}}`),this}ilikeAnyOf(e,t){return this.url.searchParams.append(e,`ilike(any).{${t.join(",")}}`),this}is(e,t){return this.url.searchParams.append(e,`is.${t}`),this}in(e,t){const r=Array.from(new Set(t)).map((e=>"string"==typeof e&&new RegExp("[,()]").test(e)?`"${e}"`:`${e}`)).join(",");return this.url.searchParams.append(e,`in.(${r})`),this}contains(e,t){return"string"==typeof t?this.url.searchParams.append(e,`cs.${t}`):Array.isArray(t)?this.url.searchParams.append(e,`cs.{${t.join(",")}}`):this.url.searchParams.append(e,`cs.${JSON.stringify(t)}`),this}containedBy(e,t){return"string"==typeof t?this.url.searchParams.append(e,`cd.${t}`):Array.isArray(t)?this.url.searchParams.append(e,`cd.{${t.join(",")}}`):this.url.searchParams.append(e,`cd.${JSON.stringify(t)}`),this}rangeGt(e,t){return this.url.searchParams.append(e,`sr.${t}`),this}rangeGte(e,t){return this.url.searchParams.append(e,`nxl.${t}`),this}rangeLt(e,t){return this.url.searchParams.append(e,`sl.${t}`),this}rangeLte(e,t){return this.url.searchParams.append(e,`nxr.${t}`),this}rangeAdjacent(e,t){return this.url.searchParams.append(e,`adj.${t}`),this}overlaps(e,t){return"string"==typeof t?this.url.searchParams.append(e,`ov.${t}`):this.url.searchParams.append(e,`ov.{${t.join(",")}}`),this}textSearch(e,t,{config:r,type:s}={}){let i="";"plain"===s?i="pl":"phrase"===s?i="ph":"websearch"===s&&(i="w");const n=void 0===r?"":`(${r})`;return this.url.searchParams.append(e,`${i}fts${n}.${t}`),this}match(e){return Object.entries(e).forEach((([e,t])=>{this.url.searchParams.append(e,`eq.${t}`)})),this}not(e,t,r){return this.url.searchParams.append(e,`not.${t}.${r}`),this}or(e,{foreignTable:t,referencedTable:r=t}={}){const s=r?`${r}.or`:"or";return this.url.searchParams.append(s,`(${e})`),this}filter(e,t,r){return this.url.searchParams.append(e,`${t}.${r}`),this}}t.default=n},45:function(e,t,r){var s=this&&this.__importDefault||function(e){return e&&e.__esModule?e:{default:e}};Object.defineProperty(t,"__esModule",{value:!0});const i=s(r(825));t.default=class{constructor(e,{headers:t={},schema:r,fetch:s}){this.url=e,this.headers=t,this.schema=r,this.fetch=s}select(e,{head:t=!1,count:r}={}){const s=t?"HEAD":"GET";let n=!1;const o=(null!=e?e:"*").split("").map((e=>/\s/.test(e)&&!n?"":('"'===e&&(n=!n),e))).join("");return this.url.searchParams.set("select",o),r&&(this.headers.Prefer=`count=${r}`),new i.default({method:s,url:this.url,headers:this.headers,schema:this.schema,fetch:this.fetch,allowEmpty:!1})}insert(e,{count:t,defaultToNull:r=!0}={}){const s=[];if(this.headers.Prefer&&s.push(this.headers.Prefer),t&&s.push(`count=${t}`),r||s.push("missing=default"),this.headers.Prefer=s.join(","),Array.isArray(e)){const t=e.reduce(((e,t)=>e.concat(Object.keys(t))),[]);if(t.length>0){const e=[...new Set(t)].map((e=>`"${e}"`));this.url.searchParams.set("columns",e.join(","))}}return new i.default({method:"POST",url:this.url,headers:this.headers,schema:this.schema,body:e,fetch:this.fetch,allowEmpty:!1})}upsert(e,{onConflict:t,ignoreDuplicates:r=!1,count:s,defaultToNull:n=!0}={}){const o=[`resolution=${r?"ignore":"merge"}-duplicates`];if(void 0!==t&&this.url.searchParams.set("on_conflict",t),this.headers.Prefer&&o.push(this.headers.Prefer),s&&o.push(`count=${s}`),n||o.push("missing=default"),this.headers.Prefer=o.join(","),Array.isArray(e)){const t=e.reduce(((e,t)=>e.concat(Object.keys(t))),[]);if(t.length>0){const e=[...new Set(t)].map((e=>`"${e}"`));this.url.searchParams.set("columns",e.join(","))}}return new i.default({method:"POST",url:this.url,headers:this.headers,schema:this.schema,body:e,fetch:this.fetch,allowEmpty:!1})}update(e,{count:t}={}){const r=[];return this.headers.Prefer&&r.push(this.headers.Prefer),t&&r.push(`count=${t}`),this.headers.Prefer=r.join(","),new i.default({method:"PATCH",url:this.url,headers:this.headers,schema:this.schema,body:e,fetch:this.fetch,allowEmpty:!1})}delete({count:e}={}){const t=[];return e&&t.push(`count=${e}`),this.headers.Prefer&&t.unshift(this.headers.Prefer),this.headers.Prefer=t.join(","),new i.default({method:"DELETE",url:this.url,headers:this.headers,schema:this.schema,fetch:this.fetch,allowEmpty:!1})}}},261:function(e,t,r){var s=this&&this.__importDefault||function(e){return e&&e.__esModule?e:{default:e}};Object.defineProperty(t,"__esModule",{value:!0});const i=s(r(660));class n extends i.default{select(e){let t=!1;const r=(null!=e?e:"*").split("").map((e=>/\s/.test(e)&&!t?"":('"'===e&&(t=!t),e))).join("");return this.url.searchParams.set("select",r),this.headers.Prefer&&(this.headers.Prefer+=","),this.headers.Prefer+="return=representation",this}order(e,{ascending:t=!0,nullsFirst:r,foreignTable:s,referencedTable:i=s}={}){const n=i?`${i}.order`:"order",o=this.url.searchParams.get(n);return this.url.searchParams.set(n,`${o?`${o},`:""}${e}.${t?"asc":"desc"}${void 0===r?"":r?".nullsfirst":".nullslast"}`),this}limit(e,{foreignTable:t,referencedTable:r=t}={}){const s=void 0===r?"limit":`${r}.limit`;return this.url.searchParams.set(s,`${e}`),this}range(e,t,{foreignTable:r,referencedTable:s=r}={}){const i=void 0===s?"offset":`${s}.offset`,n=void 0===s?"limit":`${s}.limit`;return this.url.searchParams.set(i,`${e}`),this.url.searchParams.set(n,""+(t-e+1)),this}abortSignal(e){return this.signal=e,this}single(){return this.headers.Accept="application/vnd.pgrst.object+json",this}maybeSingle(){return"GET"===this.method?this.headers.Accept="application/json":this.headers.Accept="application/vnd.pgrst.object+json",this.isMaybeSingle=!0,this}csv(){return this.headers.Accept="text/csv",this}geojson(){return this.headers.Accept="application/geo+json",this}explain({analyze:e=!1,verbose:t=!1,settings:r=!1,buffers:s=!1,wal:i=!1,format:n="text"}={}){var o;const a=[e?"analyze":null,t?"verbose":null,r?"settings":null,s?"buffers":null,i?"wal":null].filter(Boolean).join("|"),c=null!==(o=this.headers.Accept)&&void 0!==o?o:"application/json";return this.headers.Accept=`application/vnd.pgrst.plan+${n}; for="${c}"; options=${a};`,this}rollback(){var e;return(null!==(e=this.headers.Prefer)&&void 0!==e?e:"").trim().length>0?this.headers.Prefer+=",tx=rollback":this.headers.Prefer="tx=rollback",this}returns(){return this}}t.default=n},530:(e,t,r)=>{Object.defineProperty(t,"__esModule",{value:!0}),t.DEFAULT_HEADERS=void 0;const s=r(519);t.DEFAULT_HEADERS={"X-Client-Info":`postgrest-js/${s.version}`}},279:function(e,t,r){var s=this&&this.__importDefault||function(e){return e&&e.__esModule?e:{default:e}};Object.defineProperty(t,"__esModule",{value:!0}),t.PostgrestError=t.PostgrestBuilder=t.PostgrestTransformBuilder=t.PostgrestFilterBuilder=t.PostgrestQueryBuilder=t.PostgrestClient=void 0;const i=s(r(961));t.PostgrestClient=i.default;const n=s(r(45));t.PostgrestQueryBuilder=n.default;const o=s(r(825));t.PostgrestFilterBuilder=o.default;const a=s(r(261));t.PostgrestTransformBuilder=a.default;const c=s(r(660));t.PostgrestBuilder=c.default;const l=s(r(818));t.PostgrestError=l.default,t.default={PostgrestClient:i.default,PostgrestQueryBuilder:n.default,PostgrestFilterBuilder:o.default,PostgrestTransformBuilder:a.default,PostgrestBuilder:c.default,PostgrestError:l.default}},519:(e,t)=>{Object.defineProperty(t,"__esModule",{value:!0}),t.version=void 0,t.version="2.49.4"},932:(e,t,r)=>{r.r(t),r.d(t,{REALTIME_CHANNEL_STATES:()=>P,REALTIME_LISTEN_TYPES:()=>E,REALTIME_POSTGRES_CHANGES_LISTEN_EVENT:()=>S,REALTIME_PRESENCE_LISTEN_EVENTS:()=>T,REALTIME_SUBSCRIBE_STATES:()=>j,RealtimeChannel:()=>A,RealtimeClient:()=>x,RealtimePresence:()=>O});const s={"X-Client-Info":"realtime-js/2.11.2"};var i,n,o,a,c,l;!function(e){e[e.connecting=0]="connecting",e[e.open=1]="open",e[e.closing=2]="closing",e[e.closed=3]="closed"}(i||(i={})),function(e){e.closed="closed",e.errored="errored",e.joined="joined",e.joining="joining",e.leaving="leaving"}(n||(n={})),function(e){e.close="phx_close",e.error="phx_error",e.join="phx_join",e.reply="phx_reply",e.leave="phx_leave",e.access_token="access_token"}(o||(o={})),function(e){e.websocket="websocket"}(a||(a={})),function(e){e.Connecting="connecting",e.Open="open",e.Closing="closing",e.Closed="closed"}(c||(c={}));class h{constructor(){this.HEADER_LENGTH=1}decode(e,t){return e.constructor===ArrayBuffer?t(this._binaryDecode(e)):t("string"==typeof e?JSON.parse(e):{})}_binaryDecode(e){const t=new DataView(e),r=new TextDecoder;return this._decodeBroadcast(e,t,r)}_decodeBroadcast(e,t,r){const s=t.getUint8(1),i=t.getUint8(2);let n=this.HEADER_LENGTH+2;const o=r.decode(e.slice(n,n+s));n+=s;const a=r.decode(e.slice(n,n+i));return n+=i,{ref:null,topic:o,event:a,payload:JSON.parse(r.decode(e.slice(n,e.byteLength)))}}}class u{constructor(e,t){this.callback=e,this.timerCalc=t,this.timer=void 0,this.tries=0,this.callback=e,this.timerCalc=t}reset(){this.tries=0,clearTimeout(this.timer)}scheduleTimeout(){clearTimeout(this.timer),this.timer=setTimeout((()=>{this.tries=this.tries+1,this.callback()}),this.timerCalc(this.tries+1))}}!function(e){e.abstime="abstime",e.bool="bool",e.date="date",e.daterange="daterange",e.float4="float4",e.float8="float8",e.int2="int2",e.int4="int4",e.int4range="int4range",e.int8="int8",e.int8range="int8range",e.json="json",e.jsonb="jsonb",e.money="money",e.numeric="numeric",e.oid="oid",e.reltime="reltime",e.text="text",e.time="time",e.timestamp="timestamp",e.timestamptz="timestamptz",e.timetz="timetz",e.tsrange="tsrange",e.tstzrange="tstzrange"}(l||(l={}));const d=(e,t,r={})=>{var s;const i=null!==(s=r.skipTypes)&&void 0!==s?s:[];return Object.keys(t).reduce(((r,s)=>(r[s]=f(s,e,t,i),r)),{})},f=(e,t,r,s)=>{const i=t.find((t=>t.name===e)),n=null==i?void 0:i.type,o=r[e];return n&&!s.includes(n)?p(n,o):g(o)},p=(e,t)=>{if("_"===e.charAt(0)){const r=e.slice(1,e.length);return _(t,r)}switch(e){case l.bool:return v(t);case l.float4:case l.float8:case l.int2:case l.int4:case l.int8:case l.numeric:case l.oid:return y(t);case l.json:case l.jsonb:return m(t);case l.timestamp:return w(t);case l.abstime:case l.date:case l.daterange:case l.int4range:case l.int8range:case l.money:case l.reltime:case l.text:case l.time:case l.timestamptz:case l.timetz:case l.tsrange:case l.tstzrange:default:return g(t)}},g=e=>e,v=e=>{switch(e){case"t":return!0;case"f":return!1;default:return e}},y=e=>{if("string"==typeof e){const t=parseFloat(e);if(!Number.isNaN(t))return t}return e},m=e=>{if("string"==typeof e)try{return JSON.parse(e)}catch(t){return console.log(`JSON parse error: ${t}`),e}return e},_=(e,t)=>{if("string"!=typeof e)return e;const r=e.length-1,s=e[r];if("{"===e[0]&&"}"===s){let s;const i=e.slice(1,r);try{s=JSON.parse("["+i+"]")}catch(e){s=i?i.split(","):[]}return s.map((e=>p(t,e)))}return e},w=e=>"string"==typeof e?e.replace(" ","T"):e,b=e=>{let t=e;return t=t.replace(/^ws/i,"http"),t=t.replace(/(\/socket\/websocket|\/socket|\/websocket)\/?$/i,""),t.replace(/\/+$/,"")};class k{constructor(e,t,r={},s=1e4){this.channel=e,this.event=t,this.payload=r,this.timeout=s,this.sent=!1,this.timeoutTimer=void 0,this.ref="",this.receivedResp=null,this.recHooks=[],this.refEvent=null}resend(e){this.timeout=e,this._cancelRefEvent(),this.ref="",this.refEvent=null,this.receivedResp=null,this.sent=!1,this.send()}send(){this._hasReceived("timeout")||(this.startTimeout(),this.sent=!0,this.channel.socket.push({topic:this.channel.topic,event:this.event,payload:this.payload,ref:this.ref,join_ref:this.channel._joinRef()}))}updatePayload(e){this.payload=Object.assign(Object.assign({},this.payload),e)}receive(e,t){var r;return this._hasReceived(e)&&t(null===(r=this.receivedResp)||void 0===r?void 0:r.response),this.recHooks.push({status:e,callback:t}),this}startTimeout(){this.timeoutTimer||(this.ref=this.channel.socket._makeRef(),this.refEvent=this.channel._replyEventName(this.ref),this.channel._on(this.refEvent,{},(e=>{this._cancelRefEvent(),this._cancelTimeout(),this.receivedResp=e,this._matchReceive(e)})),this.timeoutTimer=setTimeout((()=>{this.trigger("timeout",{})}),this.timeout))}trigger(e,t){this.refEvent&&this.channel._trigger(this.refEvent,{status:e,response:t})}destroy(){this._cancelRefEvent(),this._cancelTimeout()}_cancelRefEvent(){this.refEvent&&this.channel._off(this.refEvent,{})}_cancelTimeout(){clearTimeout(this.timeoutTimer),this.timeoutTimer=void 0}_matchReceive({status:e,response:t}){this.recHooks.filter((t=>t.status===e)).forEach((e=>e.callback(t)))}_hasReceived(e){return this.receivedResp&&this.receivedResp.status===e}}var T,S,E,j;!function(e){e.SYNC="sync",e.JOIN="join",e.LEAVE="leave"}(T||(T={}));class O{constructor(e,t){this.channel=e,this.state={},this.pendingDiffs=[],this.joinRef=null,this.caller={onJoin:()=>{},onLeave:()=>{},onSync:()=>{}};const r=(null==t?void 0:t.events)||{state:"presence_state",diff:"presence_diff"};this.channel._on(r.state,{},(e=>{const{onJoin:t,onLeave:r,onSync:s}=this.caller;this.joinRef=this.channel._joinRef(),this.state=O.syncState(this.state,e,t,r),this.pendingDiffs.forEach((e=>{this.state=O.syncDiff(this.state,e,t,r)})),this.pendingDiffs=[],s()})),this.channel._on(r.diff,{},(e=>{const{onJoin:t,onLeave:r,onSync:s}=this.caller;this.inPendingSyncState()?this.pendingDiffs.push(e):(this.state=O.syncDiff(this.state,e,t,r),s())})),this.onJoin(((e,t,r)=>{this.channel._trigger("presence",{event:"join",key:e,currentPresences:t,newPresences:r})})),this.onLeave(((e,t,r)=>{this.channel._trigger("presence",{event:"leave",key:e,currentPresences:t,leftPresences:r})})),this.onSync((()=>{this.channel._trigger("presence",{event:"sync"})}))}static syncState(e,t,r,s){const i=this.cloneDeep(e),n=this.transformState(t),o={},a={};return this.map(i,((e,t)=>{n[e]||(a[e]=t)})),this.map(n,((e,t)=>{const r=i[e];if(r){const s=t.map((e=>e.presence_ref)),i=r.map((e=>e.presence_ref)),n=t.filter((e=>i.indexOf(e.presence_ref)<0)),c=r.filter((e=>s.indexOf(e.presence_ref)<0));n.length>0&&(o[e]=n),c.length>0&&(a[e]=c)}else o[e]=t})),this.syncDiff(i,{joins:o,leaves:a},r,s)}static syncDiff(e,t,r,s){const{joins:i,leaves:n}={joins:this.transformState(t.joins),leaves:this.transformState(t.leaves)};return r||(r=()=>{}),s||(s=()=>{}),this.map(i,((t,s)=>{var i;const n=null!==(i=e[t])&&void 0!==i?i:[];if(e[t]=this.cloneDeep(s),n.length>0){const r=e[t].map((e=>e.presence_ref)),s=n.filter((e=>r.indexOf(e.presence_ref)<0));e[t].unshift(...s)}r(t,n,s)})),this.map(n,((t,r)=>{let i=e[t];if(!i)return;const n=r.map((e=>e.presence_ref));i=i.filter((e=>n.indexOf(e.presence_ref)<0)),e[t]=i,s(t,i,r),0===i.length&&delete e[t]})),e}static map(e,t){return Object.getOwnPropertyNames(e).map((r=>t(r,e[r])))}static transformState(e){return e=this.cloneDeep(e),Object.getOwnPropertyNames(e).reduce(((t,r)=>{const s=e[r];return t[r]="metas"in s?s.metas.map((e=>(e.presence_ref=e.phx_ref,delete e.phx_ref,delete e.phx_ref_prev,e))):s,t}),{})}static cloneDeep(e){return JSON.parse(JSON.stringify(e))}onJoin(e){this.caller.onJoin=e}onLeave(e){this.caller.onLeave=e}onSync(e){this.caller.onSync=e}inPendingSyncState(){return!this.joinRef||this.joinRef!==this.channel._joinRef()}}!function(e){e.ALL="*",e.INSERT="INSERT",e.UPDATE="UPDATE",e.DELETE="DELETE"}(S||(S={})),function(e){e.BROADCAST="broadcast",e.PRESENCE="presence",e.POSTGRES_CHANGES="postgres_changes",e.SYSTEM="system"}(E||(E={})),function(e){e.SUBSCRIBED="SUBSCRIBED",e.TIMED_OUT="TIMED_OUT",e.CLOSED="CLOSED",e.CHANNEL_ERROR="CHANNEL_ERROR"}(j||(j={}));const P=n;class A{constructor(e,t={config:{}},r){this.topic=e,this.params=t,this.socket=r,this.bindings={},this.state=n.closed,this.joinedOnce=!1,this.pushBuffer=[],this.subTopic=e.replace(/^realtime:/i,""),this.params.config=Object.assign({broadcast:{ack:!1,self:!1},presence:{key:""},private:!1},t.config),this.timeout=this.socket.timeout,this.joinPush=new k(this,o.join,this.params,this.timeout),this.rejoinTimer=new u((()=>this._rejoinUntilConnected()),this.socket.reconnectAfterMs),this.joinPush.receive("ok",(()=>{this.state=n.joined,this.rejoinTimer.reset(),this.pushBuffer.forEach((e=>e.send())),this.pushBuffer=[]})),this._onClose((()=>{this.rejoinTimer.reset(),this.socket.log("channel",`close ${this.topic} ${this._joinRef()}`),this.state=n.closed,this.socket._remove(this)})),this._onError((e=>{this._isLeaving()||this._isClosed()||(this.socket.log("channel",`error ${this.topic}`,e),this.state=n.errored,this.rejoinTimer.scheduleTimeout())})),this.joinPush.receive("timeout",(()=>{this._isJoining()&&(this.socket.log("channel",`timeout ${this.topic}`,this.joinPush.timeout),this.state=n.errored,this.rejoinTimer.scheduleTimeout())})),this._on(o.reply,{},((e,t)=>{this._trigger(this._replyEventName(t),e)})),this.presence=new O(this),this.broadcastEndpointURL=b(this.socket.endPoint)+"/api/broadcast",this.private=this.params.config.private||!1}subscribe(e,t=this.timeout){var r,s;if(this.socket.isConnected()||this.socket.connect(),this.joinedOnce)throw"tried to subscribe multiple times. 'subscribe' can only be called a single time per channel instance";{const{config:{broadcast:i,presence:n,private:o}}=this.params;this._onError((t=>null==e?void 0:e(j.CHANNEL_ERROR,t))),this._onClose((()=>null==e?void 0:e(j.CLOSED)));const a={},c={broadcast:i,presence:n,postgres_changes:null!==(s=null===(r=this.bindings.postgres_changes)||void 0===r?void 0:r.map((e=>e.filter)))&&void 0!==s?s:[],private:o};this.socket.accessTokenValue&&(a.access_token=this.socket.accessTokenValue),this.updateJoinPayload(Object.assign({config:c},a)),this.joinedOnce=!0,this._rejoin(t),this.joinPush.receive("ok",(async({postgres_changes:t})=>{var r;if(this.socket.setAuth(),void 0!==t){const s=this.bindings.postgres_changes,i=null!==(r=null==s?void 0:s.length)&&void 0!==r?r:0,n=[];for(let r=0;r<i;r++){const i=s[r],{filter:{event:o,schema:a,table:c,filter:l}}=i,h=t&&t[r];if(!h||h.event!==o||h.schema!==a||h.table!==c||h.filter!==l)return this.unsubscribe(),void(null==e||e(j.CHANNEL_ERROR,new Error("mismatch between server and client bindings for postgres changes")));n.push(Object.assign(Object.assign({},i),{id:h.id}))}return this.bindings.postgres_changes=n,void(e&&e(j.SUBSCRIBED))}null==e||e(j.SUBSCRIBED)})).receive("error",(t=>{null==e||e(j.CHANNEL_ERROR,new Error(JSON.stringify(Object.values(t).join(", ")||"error")))})).receive("timeout",(()=>{null==e||e(j.TIMED_OUT)}))}return this}presenceState(){return this.presence.state}async track(e,t={}){return await this.send({type:"presence",event:"track",payload:e},t.timeout||this.timeout)}async untrack(e={}){return await this.send({type:"presence",event:"untrack"},e)}on(e,t,r){return this._on(e,t,r)}async send(e,t={}){var r,s;if(this._canPush()||"broadcast"!==e.type)return new Promise((r=>{var s,i,n;const o=this._push(e.type,e,t.timeout||this.timeout);"broadcast"!==e.type||(null===(n=null===(i=null===(s=this.params)||void 0===s?void 0:s.config)||void 0===i?void 0:i.broadcast)||void 0===n?void 0:n.ack)||r("ok"),o.receive("ok",(()=>r("ok"))),o.receive("error",(()=>r("error"))),o.receive("timeout",(()=>r("timed out")))}));{const{event:i,payload:n}=e,o={method:"POST",headers:{Authorization:this.socket.accessTokenValue?`Bearer ${this.socket.accessTokenValue}`:"",apikey:this.socket.apiKey?this.socket.apiKey:"","Content-Type":"application/json"},body:JSON.stringify({messages:[{topic:this.subTopic,event:i,payload:n,private:this.private}]})};try{const e=await this._fetchWithTimeout(this.broadcastEndpointURL,o,null!==(r=t.timeout)&&void 0!==r?r:this.timeout);return await(null===(s=e.body)||void 0===s?void 0:s.cancel()),e.ok?"ok":"error"}catch(e){return"AbortError"===e.name?"timed out":"error"}}}updateJoinPayload(e){this.joinPush.updatePayload(e)}unsubscribe(e=this.timeout){this.state=n.leaving;const t=()=>{this.socket.log("channel",`leave ${this.topic}`),this._trigger(o.close,"leave",this._joinRef())};return this.rejoinTimer.reset(),this.joinPush.destroy(),new Promise((r=>{const s=new k(this,o.leave,{},e);s.receive("ok",(()=>{t(),r("ok")})).receive("timeout",(()=>{t(),r("timed out")})).receive("error",(()=>{r("error")})),s.send(),this._canPush()||s.trigger("ok",{})}))}async _fetchWithTimeout(e,t,r){const s=new AbortController,i=setTimeout((()=>s.abort()),r),n=await this.socket.fetch(e,Object.assign(Object.assign({},t),{signal:s.signal}));return clearTimeout(i),n}_push(e,t,r=this.timeout){if(!this.joinedOnce)throw`tried to push '${e}' to '${this.topic}' before joining. Use channel.subscribe() before pushing events`;let s=new k(this,e,t,r);return this._canPush()?s.send():(s.startTimeout(),this.pushBuffer.push(s)),s}_onMessage(e,t,r){return t}_isMember(e){return this.topic===e}_joinRef(){return this.joinPush.ref}_trigger(e,t,r){var s,i;const n=e.toLocaleLowerCase(),{close:a,error:c,leave:l,join:h}=o;if(r&&[a,c,l,h].indexOf(n)>=0&&r!==this._joinRef())return;let u=this._onMessage(n,t,r);if(t&&!u)throw"channel onMessage callbacks must return the payload, modified or unmodified";["insert","update","delete"].includes(n)?null===(s=this.bindings.postgres_changes)||void 0===s||s.filter((e=>{var t,r,s;return"*"===(null===(t=e.filter)||void 0===t?void 0:t.event)||(null===(s=null===(r=e.filter)||void 0===r?void 0:r.event)||void 0===s?void 0:s.toLocaleLowerCase())===n})).map((e=>e.callback(u,r))):null===(i=this.bindings[n])||void 0===i||i.filter((e=>{var r,s,i,o,a,c;if(["broadcast","presence","postgres_changes"].includes(n)){if("id"in e){const n=e.id,o=null===(r=e.filter)||void 0===r?void 0:r.event;return n&&(null===(s=t.ids)||void 0===s?void 0:s.includes(n))&&("*"===o||(null==o?void 0:o.toLocaleLowerCase())===(null===(i=t.data)||void 0===i?void 0:i.type.toLocaleLowerCase()))}{const r=null===(a=null===(o=null==e?void 0:e.filter)||void 0===o?void 0:o.event)||void 0===a?void 0:a.toLocaleLowerCase();return"*"===r||r===(null===(c=null==t?void 0:t.event)||void 0===c?void 0:c.toLocaleLowerCase())}}return e.type.toLocaleLowerCase()===n})).map((e=>{if("object"==typeof u&&"ids"in u){const e=u.data,{schema:t,table:r,commit_timestamp:s,type:i,errors:n}=e,o={schema:t,table:r,commit_timestamp:s,eventType:i,new:{},old:{},errors:n};u=Object.assign(Object.assign({},o),this._getPayloadRecords(e))}e.callback(u,r)}))}_isClosed(){return this.state===n.closed}_isJoined(){return this.state===n.joined}_isJoining(){return this.state===n.joining}_isLeaving(){return this.state===n.leaving}_replyEventName(e){return`chan_reply_${e}`}_on(e,t,r){const s=e.toLocaleLowerCase(),i={type:s,filter:t,callback:r};return this.bindings[s]?this.bindings[s].push(i):this.bindings[s]=[i],this}_off(e,t){const r=e.toLocaleLowerCase();return this.bindings[r]=this.bindings[r].filter((e=>{var s;return!((null===(s=e.type)||void 0===s?void 0:s.toLocaleLowerCase())===r&&A.isEqual(e.filter,t))})),this}static isEqual(e,t){if(Object.keys(e).length!==Object.keys(t).length)return!1;for(const r in e)if(e[r]!==t[r])return!1;return!0}_rejoinUntilConnected(){this.rejoinTimer.scheduleTimeout(),this.socket.isConnected()&&this._rejoin()}_onClose(e){this._on(o.close,{},e)}_onError(e){this._on(o.error,{},(t=>e(t)))}_canPush(){return this.socket.isConnected()&&this._isJoined()}_rejoin(e=this.timeout){this._isLeaving()||(this.socket._leaveOpenTopic(this.topic),this.state=n.joining,this.joinPush.resend(e))}_getPayloadRecords(e){const t={new:{},old:{}};return"INSERT"!==e.type&&"UPDATE"!==e.type||(t.new=d(e.columns,e.record)),"UPDATE"!==e.type&&"DELETE"!==e.type||(t.old=d(e.columns,e.old_record)),t}}const $=()=>{},C="undefined"!=typeof WebSocket;class x{constructor(e,t){var i;this.accessTokenValue=null,this.apiKey=null,this.channels=[],this.endPoint="",this.httpEndpoint="",this.headers=s,this.params={},this.timeout=1e4,this.heartbeatIntervalMs=3e4,this.heartbeatTimer=void 0,this.pendingHeartbeatRef=null,this.ref=0,this.logger=$,this.conn=null,this.sendBuffer=[],this.serializer=new h,this.stateChangeCallbacks={open:[],close:[],error:[],message:[]},this.accessToken=null,this._resolveFetch=e=>{let t;return t=e||("undefined"==typeof fetch?(...e)=>Promise.resolve().then(r.bind(r,907)).then((({default:t})=>t(...e))):fetch),(...e)=>t(...e)},this.endPoint=`${e}/${a.websocket}`,this.httpEndpoint=b(e),(null==t?void 0:t.transport)?this.transport=t.transport:this.transport=null,(null==t?void 0:t.params)&&(this.params=t.params),(null==t?void 0:t.headers)&&(this.headers=Object.assign(Object.assign({},this.headers),t.headers)),(null==t?void 0:t.timeout)&&(this.timeout=t.timeout),(null==t?void 0:t.logger)&&(this.logger=t.logger),(null==t?void 0:t.heartbeatIntervalMs)&&(this.heartbeatIntervalMs=t.heartbeatIntervalMs);const n=null===(i=null==t?void 0:t.params)||void 0===i?void 0:i.apikey;if(n&&(this.accessTokenValue=n,this.apiKey=n),this.reconnectAfterMs=(null==t?void 0:t.reconnectAfterMs)?t.reconnectAfterMs:e=>[1e3,2e3,5e3,1e4][e-1]||1e4,this.encode=(null==t?void 0:t.encode)?t.encode:(e,t)=>t(JSON.stringify(e)),this.decode=(null==t?void 0:t.decode)?t.decode:this.serializer.decode.bind(this.serializer),this.reconnectTimer=new u((async()=>{this.disconnect(),this.connect()}),this.reconnectAfterMs),this.fetch=this._resolveFetch(null==t?void 0:t.fetch),null==t?void 0:t.worker){if("undefined"!=typeof window&&!window.Worker)throw new Error("Web Worker is not supported");this.worker=(null==t?void 0:t.worker)||!1,this.workerUrl=null==t?void 0:t.workerUrl}this.accessToken=(null==t?void 0:t.accessToken)||null}connect(){if(!this.conn)if(this.transport)this.conn=new this.transport(this.endpointURL(),void 0,{headers:this.headers});else{if(C)return this.conn=new WebSocket(this.endpointURL()),void this.setupConnection();this.conn=new R(this.endpointURL(),void 0,{close:()=>{this.conn=null}}),r.e(591).then(r.t.bind(r,591,23)).then((({default:e})=>{this.conn=new e(this.endpointURL(),void 0,{headers:this.headers}),this.setupConnection()}))}}endpointURL(){return this._appendParams(this.endPoint,Object.assign({},this.params,{vsn:"1.0.0"}))}disconnect(e,t){this.conn&&(this.conn.onclose=function(){},e?this.conn.close(e,null!=t?t:""):this.conn.close(),this.conn=null,this.heartbeatTimer&&clearInterval(this.heartbeatTimer),this.reconnectTimer.reset())}getChannels(){return this.channels}async removeChannel(e){const t=await e.unsubscribe();return 0===this.channels.length&&this.disconnect(),t}async removeAllChannels(){const e=await Promise.all(this.channels.map((e=>e.unsubscribe())));return this.disconnect(),e}log(e,t,r){this.logger(e,t,r)}connectionState(){switch(this.conn&&this.conn.readyState){case i.connecting:return c.Connecting;case i.open:return c.Open;case i.closing:return c.Closing;default:return c.Closed}}isConnected(){return this.connectionState()===c.Open}channel(e,t={config:{}}){const r=new A(`realtime:${e}`,t,this);return this.channels.push(r),r}push(e){const{topic:t,event:r,payload:s,ref:i}=e,n=()=>{this.encode(e,(e=>{var t;null===(t=this.conn)||void 0===t||t.send(e)}))};this.log("push",`${t} ${r} (${i})`,s),this.isConnected()?n():this.sendBuffer.push(n)}async setAuth(e=null){let t=e||this.accessToken&&await this.accessToken()||this.accessTokenValue;if(t){let e=null;try{e=JSON.parse(atob(t.split(".")[1]))}catch(e){}if(e&&e.exp&&!(Math.floor(Date.now()/1e3)-e.exp<0))return this.log("auth",`InvalidJWTToken: Invalid value for JWT claim "exp" with value ${e.exp}`),Promise.reject(`InvalidJWTToken: Invalid value for JWT claim "exp" with value ${e.exp}`);this.accessTokenValue=t,this.channels.forEach((e=>{t&&e.updateJoinPayload({access_token:t}),e.joinedOnce&&e._isJoined()&&e._push(o.access_token,{access_token:t})}))}}async sendHeartbeat(){var e;if(this.isConnected()){if(this.pendingHeartbeatRef)return this.pendingHeartbeatRef=null,this.log("transport","heartbeat timeout. Attempting to re-establish connection"),void(null===(e=this.conn)||void 0===e||e.close(1e3,"hearbeat timeout"));this.pendingHeartbeatRef=this._makeRef(),this.push({topic:"phoenix",event:"heartbeat",payload:{},ref:this.pendingHeartbeatRef}),this.setAuth()}}flushSendBuffer(){this.isConnected()&&this.sendBuffer.length>0&&(this.sendBuffer.forEach((e=>e())),this.sendBuffer=[])}_makeRef(){let e=this.ref+1;return e===this.ref?this.ref=0:this.ref=e,this.ref.toString()}_leaveOpenTopic(e){let t=this.channels.find((t=>t.topic===e&&(t._isJoined()||t._isJoining())));t&&(this.log("transport",`leaving duplicate topic "${e}"`),t.unsubscribe())}_remove(e){this.channels=this.channels.filter((t=>t._joinRef()!==e._joinRef()))}setupConnection(){this.conn&&(this.conn.binaryType="arraybuffer",this.conn.onopen=()=>this._onConnOpen(),this.conn.onerror=e=>this._onConnError(e),this.conn.onmessage=e=>this._onConnMessage(e),this.conn.onclose=e=>this._onConnClose(e))}_onConnMessage(e){this.decode(e.data,(e=>{let{topic:t,event:r,payload:s,ref:i}=e;i&&i===this.pendingHeartbeatRef&&(this.pendingHeartbeatRef=null),this.log("receive",`${s.status||""} ${t} ${r} ${i&&"("+i+")"||""}`,s),this.channels.filter((e=>e._isMember(t))).forEach((e=>e._trigger(r,s,i))),this.stateChangeCallbacks.message.forEach((t=>t(e)))}))}async _onConnOpen(){if(this.log("transport",`connected to ${this.endpointURL()}`),this.flushSendBuffer(),this.reconnectTimer.reset(),this.worker){this.workerUrl?this.log("worker",`starting worker for from ${this.workerUrl}`):this.log("worker","starting default worker");const e=this._workerObjectUrl(this.workerUrl);this.workerRef=new Worker(e),this.workerRef.onerror=e=>{this.log("worker","worker error",e.message),this.workerRef.terminate()},this.workerRef.onmessage=e=>{"keepAlive"===e.data.event&&this.sendHeartbeat()},this.workerRef.postMessage({event:"start",interval:this.heartbeatIntervalMs})}else this.heartbeatTimer&&clearInterval(this.heartbeatTimer),this.heartbeatTimer=setInterval((()=>this.sendHeartbeat()),this.heartbeatIntervalMs);this.stateChangeCallbacks.open.forEach((e=>e()))}_onConnClose(e){this.log("transport","close",e),this._triggerChanError(),this.heartbeatTimer&&clearInterval(this.heartbeatTimer),this.reconnectTimer.scheduleTimeout(),this.stateChangeCallbacks.close.forEach((t=>t(e)))}_onConnError(e){this.log("transport",e.message),this._triggerChanError(),this.stateChangeCallbacks.error.forEach((t=>t(e)))}_triggerChanError(){this.channels.forEach((e=>e._trigger(o.error)))}_appendParams(e,t){if(0===Object.keys(t).length)return e;const r=e.match(/\?/)?"&":"?";return`${e}${r}${new URLSearchParams(t)}`}_workerObjectUrl(e){let t;if(e)t=e;else{const e=new Blob(['\n  addEventListener("message", (e) => {\n    if (e.data.event === "start") {\n      setInterval(() => postMessage({ event: "keepAlive" }), e.data.interval);\n    }\n  });'],{type:"application/javascript"});t=URL.createObjectURL(e)}return t}}class R{constructor(e,t,r){this.binaryType="arraybuffer",this.onclose=()=>{},this.onerror=()=>{},this.onmessage=()=>{},this.onopen=()=>{},this.readyState=i.connecting,this.send=()=>{},this.url=null,this.url=e,this.close=r.close}}},623:(e,t,r)=>{r.r(t),r.d(t,{StorageApiError:()=>n,StorageClient:()=>S,StorageError:()=>s,StorageUnknownError:()=>o,isStorageError:()=>i});class s extends Error{constructor(e){super(e),this.__isStorageError=!0,this.name="StorageError"}}function i(e){return"object"==typeof e&&null!==e&&"__isStorageError"in e}class n extends s{constructor(e,t){super(e),this.name="StorageApiError",this.status=t}toJSON(){return{name:this.name,message:this.message,status:this.status}}}class o extends s{constructor(e,t){super(e),this.name="StorageUnknownError",this.originalError=t}}const a=e=>{let t;return t=e||("undefined"==typeof fetch?(...e)=>Promise.resolve().then(r.bind(r,907)).then((({default:t})=>t(...e))):fetch),(...e)=>t(...e)},c=e=>{if(Array.isArray(e))return e.map((e=>c(e)));if("function"==typeof e||e!==Object(e))return e;const t={};return Object.entries(e).forEach((([e,r])=>{const s=e.replace(/([-_][a-z])/gi,(e=>e.toUpperCase().replace(/[-_]/g,"")));t[s]=c(r)})),t};var l=function(e,t,r,s){return new(r||(r=Promise))((function(i,n){function o(e){try{c(s.next(e))}catch(e){n(e)}}function a(e){try{c(s.throw(e))}catch(e){n(e)}}function c(e){var t;e.done?i(e.value):(t=e.value,t instanceof r?t:new r((function(e){e(t)}))).then(o,a)}c((s=s.apply(e,t||[])).next())}))};const h=e=>e.msg||e.message||e.error_description||e.error||JSON.stringify(e),u=(e,t,s)=>l(void 0,void 0,void 0,(function*(){const i=yield(a=void 0,c=void 0,l=void 0,u=function*(){return"undefined"==typeof Response?(yield Promise.resolve().then(r.bind(r,907))).Response:Response},new(l||(l=Promise))((function(e,t){function r(e){try{i(u.next(e))}catch(e){t(e)}}function s(e){try{i(u.throw(e))}catch(e){t(e)}}function i(t){var i;t.done?e(t.value):(i=t.value,i instanceof l?i:new l((function(e){e(i)}))).then(r,s)}i((u=u.apply(a,c||[])).next())})));var a,c,l,u;e instanceof i&&!(null==s?void 0:s.noResolveJson)?e.json().then((r=>{t(new n(h(r),e.status||500))})).catch((e=>{t(new o(h(e),e))})):t(new o(h(e),e))})),d=(e,t,r,s)=>{const i={method:e,headers:(null==t?void 0:t.headers)||{}};return"GET"===e?i:(i.headers=Object.assign({"Content-Type":"application/json"},null==t?void 0:t.headers),s&&(i.body=JSON.stringify(s)),Object.assign(Object.assign({},i),r))};function f(e,t,r,s,i,n){return l(this,void 0,void 0,(function*(){return new Promise(((o,a)=>{e(r,d(t,s,i,n)).then((e=>{if(!e.ok)throw e;return(null==s?void 0:s.noResolveJson)?e:e.json()})).then((e=>o(e))).catch((e=>u(e,a,s)))}))}))}function p(e,t,r,s){return l(this,void 0,void 0,(function*(){return f(e,"GET",t,r,s)}))}function g(e,t,r,s,i){return l(this,void 0,void 0,(function*(){return f(e,"POST",t,s,i,r)}))}function v(e,t,r,s,i){return l(this,void 0,void 0,(function*(){return f(e,"DELETE",t,s,i,r)}))}var y=function(e,t,r,s){return new(r||(r=Promise))((function(i,n){function o(e){try{c(s.next(e))}catch(e){n(e)}}function a(e){try{c(s.throw(e))}catch(e){n(e)}}function c(e){var t;e.done?i(e.value):(t=e.value,t instanceof r?t:new r((function(e){e(t)}))).then(o,a)}c((s=s.apply(e,t||[])).next())}))};const m={limit:100,offset:0,sortBy:{column:"name",order:"asc"}},_={cacheControl:"3600",contentType:"text/plain;charset=UTF-8",upsert:!1};class w{constructor(e,t={},r,s){this.url=e,this.headers=t,this.bucketId=r,this.fetch=a(s)}uploadOrUpdate(e,t,r,s){return y(this,void 0,void 0,(function*(){try{let i;const n=Object.assign(Object.assign({},_),s);let o=Object.assign(Object.assign({},this.headers),"POST"===e&&{"x-upsert":String(n.upsert)});const a=n.metadata;"undefined"!=typeof Blob&&r instanceof Blob?(i=new FormData,i.append("cacheControl",n.cacheControl),a&&i.append("metadata",this.encodeMetadata(a)),i.append("",r)):"undefined"!=typeof FormData&&r instanceof FormData?(i=r,i.append("cacheControl",n.cacheControl),a&&i.append("metadata",this.encodeMetadata(a))):(i=r,o["cache-control"]=`max-age=${n.cacheControl}`,o["content-type"]=n.contentType,a&&(o["x-metadata"]=this.toBase64(this.encodeMetadata(a)))),(null==s?void 0:s.headers)&&(o=Object.assign(Object.assign({},o),s.headers));const c=this._removeEmptyFolders(t),l=this._getFinalPath(c),h=yield this.fetch(`${this.url}/object/${l}`,Object.assign({method:e,body:i,headers:o},(null==n?void 0:n.duplex)?{duplex:n.duplex}:{})),u=yield h.json();return h.ok?{data:{path:c,id:u.Id,fullPath:u.Key},error:null}:{data:null,error:u}}catch(e){if(i(e))return{data:null,error:e};throw e}}))}upload(e,t,r){return y(this,void 0,void 0,(function*(){return this.uploadOrUpdate("POST",e,t,r)}))}uploadToSignedUrl(e,t,r,s){return y(this,void 0,void 0,(function*(){const n=this._removeEmptyFolders(e),o=this._getFinalPath(n),a=new URL(this.url+`/object/upload/sign/${o}`);a.searchParams.set("token",t);try{let e;const t=Object.assign({upsert:_.upsert},s),i=Object.assign(Object.assign({},this.headers),{"x-upsert":String(t.upsert)});"undefined"!=typeof Blob&&r instanceof Blob?(e=new FormData,e.append("cacheControl",t.cacheControl),e.append("",r)):"undefined"!=typeof FormData&&r instanceof FormData?(e=r,e.append("cacheControl",t.cacheControl)):(e=r,i["cache-control"]=`max-age=${t.cacheControl}`,i["content-type"]=t.contentType);const o=yield this.fetch(a.toString(),{method:"PUT",body:e,headers:i}),c=yield o.json();return o.ok?{data:{path:n,fullPath:c.Key},error:null}:{data:null,error:c}}catch(e){if(i(e))return{data:null,error:e};throw e}}))}createSignedUploadUrl(e,t){return y(this,void 0,void 0,(function*(){try{let r=this._getFinalPath(e);const i=Object.assign({},this.headers);(null==t?void 0:t.upsert)&&(i["x-upsert"]="true");const n=yield g(this.fetch,`${this.url}/object/upload/sign/${r}`,{},{headers:i}),o=new URL(this.url+n.url),a=o.searchParams.get("token");if(!a)throw new s("No token returned by API");return{data:{signedUrl:o.toString(),path:e,token:a},error:null}}catch(e){if(i(e))return{data:null,error:e};throw e}}))}update(e,t,r){return y(this,void 0,void 0,(function*(){return this.uploadOrUpdate("PUT",e,t,r)}))}move(e,t,r){return y(this,void 0,void 0,(function*(){try{return{data:yield g(this.fetch,`${this.url}/object/move`,{bucketId:this.bucketId,sourceKey:e,destinationKey:t,destinationBucket:null==r?void 0:r.destinationBucket},{headers:this.headers}),error:null}}catch(e){if(i(e))return{data:null,error:e};throw e}}))}copy(e,t,r){return y(this,void 0,void 0,(function*(){try{return{data:{path:(yield g(this.fetch,`${this.url}/object/copy`,{bucketId:this.bucketId,sourceKey:e,destinationKey:t,destinationBucket:null==r?void 0:r.destinationBucket},{headers:this.headers})).Key},error:null}}catch(e){if(i(e))return{data:null,error:e};throw e}}))}createSignedUrl(e,t,r){return y(this,void 0,void 0,(function*(){try{let s=this._getFinalPath(e),i=yield g(this.fetch,`${this.url}/object/sign/${s}`,Object.assign({expiresIn:t},(null==r?void 0:r.transform)?{transform:r.transform}:{}),{headers:this.headers});const n=(null==r?void 0:r.download)?`&download=${!0===r.download?"":r.download}`:"";return i={signedUrl:encodeURI(`${this.url}${i.signedURL}${n}`)},{data:i,error:null}}catch(e){if(i(e))return{data:null,error:e};throw e}}))}createSignedUrls(e,t,r){return y(this,void 0,void 0,(function*(){try{const s=yield g(this.fetch,`${this.url}/object/sign/${this.bucketId}`,{expiresIn:t,paths:e},{headers:this.headers}),i=(null==r?void 0:r.download)?`&download=${!0===r.download?"":r.download}`:"";return{data:s.map((e=>Object.assign(Object.assign({},e),{signedUrl:e.signedURL?encodeURI(`${this.url}${e.signedURL}${i}`):null}))),error:null}}catch(e){if(i(e))return{data:null,error:e};throw e}}))}download(e,t){return y(this,void 0,void 0,(function*(){const r=void 0!==(null==t?void 0:t.transform)?"render/image/authenticated":"object",s=this.transformOptsToQueryString((null==t?void 0:t.transform)||{}),n=s?`?${s}`:"";try{const t=this._getFinalPath(e),s=yield p(this.fetch,`${this.url}/${r}/${t}${n}`,{headers:this.headers,noResolveJson:!0});return{data:yield s.blob(),error:null}}catch(e){if(i(e))return{data:null,error:e};throw e}}))}info(e){return y(this,void 0,void 0,(function*(){const t=this._getFinalPath(e);try{const e=yield p(this.fetch,`${this.url}/object/info/${t}`,{headers:this.headers});return{data:c(e),error:null}}catch(e){if(i(e))return{data:null,error:e};throw e}}))}exists(e){return y(this,void 0,void 0,(function*(){const t=this._getFinalPath(e);try{return yield function(e,t,r){return l(this,void 0,void 0,(function*(){return f(e,"HEAD",t,Object.assign(Object.assign({},r),{noResolveJson:!0}),undefined)}))}(this.fetch,`${this.url}/object/${t}`,{headers:this.headers}),{data:!0,error:null}}catch(e){if(i(e)&&e instanceof o){const t=e.originalError;if([400,404].includes(null==t?void 0:t.status))return{data:!1,error:e}}throw e}}))}getPublicUrl(e,t){const r=this._getFinalPath(e),s=[],i=(null==t?void 0:t.download)?`download=${!0===t.download?"":t.download}`:"";""!==i&&s.push(i);const n=void 0!==(null==t?void 0:t.transform)?"render/image":"object",o=this.transformOptsToQueryString((null==t?void 0:t.transform)||{});""!==o&&s.push(o);let a=s.join("&");return""!==a&&(a=`?${a}`),{data:{publicUrl:encodeURI(`${this.url}/${n}/public/${r}${a}`)}}}remove(e){return y(this,void 0,void 0,(function*(){try{return{data:yield v(this.fetch,`${this.url}/object/${this.bucketId}`,{prefixes:e},{headers:this.headers}),error:null}}catch(e){if(i(e))return{data:null,error:e};throw e}}))}list(e,t,r){return y(this,void 0,void 0,(function*(){try{const s=Object.assign(Object.assign(Object.assign({},m),t),{prefix:e||""});return{data:yield g(this.fetch,`${this.url}/object/list/${this.bucketId}`,s,{headers:this.headers},r),error:null}}catch(e){if(i(e))return{data:null,error:e};throw e}}))}encodeMetadata(e){return JSON.stringify(e)}toBase64(e){return"undefined"!=typeof Buffer?Buffer.from(e).toString("base64"):btoa(e)}_getFinalPath(e){return`${this.bucketId}/${e}`}_removeEmptyFolders(e){return e.replace(/^\/|\/$/g,"").replace(/\/+/g,"/")}transformOptsToQueryString(e){const t=[];return e.width&&t.push(`width=${e.width}`),e.height&&t.push(`height=${e.height}`),e.resize&&t.push(`resize=${e.resize}`),e.format&&t.push(`format=${e.format}`),e.quality&&t.push(`quality=${e.quality}`),t.join("&")}}const b={"X-Client-Info":"storage-js/2.7.1"};var k=function(e,t,r,s){return new(r||(r=Promise))((function(i,n){function o(e){try{c(s.next(e))}catch(e){n(e)}}function a(e){try{c(s.throw(e))}catch(e){n(e)}}function c(e){var t;e.done?i(e.value):(t=e.value,t instanceof r?t:new r((function(e){e(t)}))).then(o,a)}c((s=s.apply(e,t||[])).next())}))};class T{constructor(e,t={},r){this.url=e,this.headers=Object.assign(Object.assign({},b),t),this.fetch=a(r)}listBuckets(){return k(this,void 0,void 0,(function*(){try{return{data:yield p(this.fetch,`${this.url}/bucket`,{headers:this.headers}),error:null}}catch(e){if(i(e))return{data:null,error:e};throw e}}))}getBucket(e){return k(this,void 0,void 0,(function*(){try{return{data:yield p(this.fetch,`${this.url}/bucket/${e}`,{headers:this.headers}),error:null}}catch(e){if(i(e))return{data:null,error:e};throw e}}))}createBucket(e,t={public:!1}){return k(this,void 0,void 0,(function*(){try{return{data:yield g(this.fetch,`${this.url}/bucket`,{id:e,name:e,public:t.public,file_size_limit:t.fileSizeLimit,allowed_mime_types:t.allowedMimeTypes},{headers:this.headers}),error:null}}catch(e){if(i(e))return{data:null,error:e};throw e}}))}updateBucket(e,t){return k(this,void 0,void 0,(function*(){try{const r=yield function(e,t,r,s){return l(this,void 0,void 0,(function*(){return f(e,"PUT",t,s,undefined,r)}))}(this.fetch,`${this.url}/bucket/${e}`,{id:e,name:e,public:t.public,file_size_limit:t.fileSizeLimit,allowed_mime_types:t.allowedMimeTypes},{headers:this.headers});return{data:r,error:null}}catch(e){if(i(e))return{data:null,error:e};throw e}}))}emptyBucket(e){return k(this,void 0,void 0,(function*(){try{return{data:yield g(this.fetch,`${this.url}/bucket/${e}/empty`,{},{headers:this.headers}),error:null}}catch(e){if(i(e))return{data:null,error:e};throw e}}))}deleteBucket(e){return k(this,void 0,void 0,(function*(){try{return{data:yield v(this.fetch,`${this.url}/bucket/${e}`,{},{headers:this.headers}),error:null}}catch(e){if(i(e))return{data:null,error:e};throw e}}))}}class S extends T{constructor(e,t={},r){super(e,t,r)}from(e){return new w(this.url,this.headers,e,this.fetch)}}},787:function(e,t,r){var s=this&&this.__awaiter||function(e,t,r,s){return new(r||(r=Promise))((function(i,n){function o(e){try{c(s.next(e))}catch(e){n(e)}}function a(e){try{c(s.throw(e))}catch(e){n(e)}}function c(e){var t;e.done?i(e.value):(t=e.value,t instanceof r?t:new r((function(e){e(t)}))).then(o,a)}c((s=s.apply(e,t||[])).next())}))};Object.defineProperty(t,"__esModule",{value:!0});const i=r(227),n=r(279),o=r(932),a=r(623),c=r(985),l=r(720),h=r(793),u=r(689);t.default=class{constructor(e,t,r){var s,i,o;if(this.supabaseUrl=e,this.supabaseKey=t,!e)throw new Error("supabaseUrl is required.");if(!t)throw new Error("supabaseKey is required.");const a=(0,h.stripTrailingSlash)(e);this.realtimeUrl=`${a}/realtime/v1`.replace(/^http/i,"ws"),this.authUrl=`${a}/auth/v1`,this.storageUrl=`${a}/storage/v1`,this.functionsUrl=`${a}/functions/v1`;const u=`sb-${new URL(this.authUrl).hostname.split(".")[0]}-auth-token`,d={db:c.DEFAULT_DB_OPTIONS,realtime:c.DEFAULT_REALTIME_OPTIONS,auth:Object.assign(Object.assign({},c.DEFAULT_AUTH_OPTIONS),{storageKey:u}),global:c.DEFAULT_GLOBAL_OPTIONS},f=(0,h.applySettingDefaults)(null!=r?r:{},d);this.storageKey=null!==(s=f.auth.storageKey)&&void 0!==s?s:"",this.headers=null!==(i=f.global.headers)&&void 0!==i?i:{},f.accessToken?(this.accessToken=f.accessToken,this.auth=new Proxy({},{get:(e,t)=>{throw new Error(`@supabase/supabase-js: Supabase Client is configured with the accessToken option, accessing supabase.auth.${String(t)} is not possible`)}})):this.auth=this._initSupabaseAuthClient(null!==(o=f.auth)&&void 0!==o?o:{},this.headers,f.global.fetch),this.fetch=(0,l.fetchWithAuth)(t,this._getAccessToken.bind(this),f.global.fetch),this.realtime=this._initRealtimeClient(Object.assign({headers:this.headers,accessToken:this._getAccessToken.bind(this)},f.realtime)),this.rest=new n.PostgrestClient(`${a}/rest/v1`,{headers:this.headers,schema:f.db.schema,fetch:this.fetch}),f.accessToken||this._listenForAuthEvents()}get functions(){return new i.FunctionsClient(this.functionsUrl,{headers:this.headers,customFetch:this.fetch})}get storage(){return new a.StorageClient(this.storageUrl,this.headers,this.fetch)}from(e){return this.rest.from(e)}schema(e){return this.rest.schema(e)}rpc(e,t={},r={}){return this.rest.rpc(e,t,r)}channel(e,t={config:{}}){return this.realtime.channel(e,t)}getChannels(){return this.realtime.getChannels()}removeChannel(e){return this.realtime.removeChannel(e)}removeAllChannels(){return this.realtime.removeAllChannels()}_getAccessToken(){var e,t;return s(this,void 0,void 0,(function*(){if(this.accessToken)return yield this.accessToken();const{data:r}=yield this.auth.getSession();return null!==(t=null===(e=r.session)||void 0===e?void 0:e.access_token)&&void 0!==t?t:null}))}_initSupabaseAuthClient({autoRefreshToken:e,persistSession:t,detectSessionInUrl:r,storage:s,storageKey:i,flowType:n,lock:o,debug:a},c,l){const h={Authorization:`Bearer ${this.supabaseKey}`,apikey:`${this.supabaseKey}`};return new u.SupabaseAuthClient({url:this.authUrl,headers:Object.assign(Object.assign({},h),c),storageKey:i,autoRefreshToken:e,persistSession:t,detectSessionInUrl:r,storage:s,flowType:n,lock:o,debug:a,fetch:l,hasCustomAuthorizationHeader:"Authorization"in this.headers})}_initRealtimeClient(e){return new o.RealtimeClient(this.realtimeUrl,Object.assign(Object.assign({},e),{params:Object.assign({apikey:this.supabaseKey},null==e?void 0:e.params)}))}_listenForAuthEvents(){return this.auth.onAuthStateChange(((e,t)=>{this._handleTokenChanged(e,"CLIENT",null==t?void 0:t.access_token)}))}_handleTokenChanged(e,t,r){"TOKEN_REFRESHED"!==e&&"SIGNED_IN"!==e||this.changedAccessToken===r?"SIGNED_OUT"===e&&(this.realtime.setAuth(),"STORAGE"==t&&this.auth.signOut(),this.changedAccessToken=void 0):this.changedAccessToken=r}}},440:function(e,t,r){var s=this&&this.__createBinding||(Object.create?function(e,t,r,s){void 0===s&&(s=r);var i=Object.getOwnPropertyDescriptor(t,r);i&&!("get"in i?!t.__esModule:i.writable||i.configurable)||(i={enumerable:!0,get:function(){return t[r]}}),Object.defineProperty(e,s,i)}:function(e,t,r,s){void 0===s&&(s=r),e[s]=t[r]}),i=this&&this.__exportStar||function(e,t){for(var r in e)"default"===r||Object.prototype.hasOwnProperty.call(t,r)||s(t,e,r)},n=this&&this.__importDefault||function(e){return e&&e.__esModule?e:{default:e}};Object.defineProperty(t,"__esModule",{value:!0}),t.createClient=t.SupabaseClient=t.FunctionRegion=t.FunctionsError=t.FunctionsRelayError=t.FunctionsFetchError=t.FunctionsHttpError=t.PostgrestError=void 0;const o=n(r(787));i(r(334),t);var a=r(279);Object.defineProperty(t,"PostgrestError",{enumerable:!0,get:function(){return a.PostgrestError}});var c=r(227);Object.defineProperty(t,"FunctionsHttpError",{enumerable:!0,get:function(){return c.FunctionsHttpError}}),Object.defineProperty(t,"FunctionsFetchError",{enumerable:!0,get:function(){return c.FunctionsFetchError}}),Object.defineProperty(t,"FunctionsRelayError",{enumerable:!0,get:function(){return c.FunctionsRelayError}}),Object.defineProperty(t,"FunctionsError",{enumerable:!0,get:function(){return c.FunctionsError}}),Object.defineProperty(t,"FunctionRegion",{enumerable:!0,get:function(){return c.FunctionRegion}}),i(r(932),t);var l=r(787);Object.defineProperty(t,"SupabaseClient",{enumerable:!0,get:function(){return n(l).default}}),t.createClient=(e,t,r)=>new o.default(e,t,r)},689:(e,t,r)=>{Object.defineProperty(t,"__esModule",{value:!0}),t.SupabaseAuthClient=void 0;const s=r(334);class i extends s.AuthClient{constructor(e){super(e)}}t.SupabaseAuthClient=i},985:(e,t,r)=>{Object.defineProperty(t,"__esModule",{value:!0}),t.DEFAULT_REALTIME_OPTIONS=t.DEFAULT_AUTH_OPTIONS=t.DEFAULT_DB_OPTIONS=t.DEFAULT_GLOBAL_OPTIONS=t.DEFAULT_HEADERS=void 0;const s=r(560);let i="";i="undefined"!=typeof Deno?"deno":"undefined"!=typeof document?"web":"undefined"!=typeof navigator&&"ReactNative"===navigator.product?"react-native":"node",t.DEFAULT_HEADERS={"X-Client-Info":`supabase-js-${i}/${s.version}`},t.DEFAULT_GLOBAL_OPTIONS={headers:t.DEFAULT_HEADERS},t.DEFAULT_DB_OPTIONS={schema:"public"},t.DEFAULT_AUTH_OPTIONS={autoRefreshToken:!0,persistSession:!0,detectSessionInUrl:!0,flowType:"implicit"},t.DEFAULT_REALTIME_OPTIONS={}},720:function(e,t,r){var s=this&&this.__createBinding||(Object.create?function(e,t,r,s){void 0===s&&(s=r);var i=Object.getOwnPropertyDescriptor(t,r);i&&!("get"in i?!t.__esModule:i.writable||i.configurable)||(i={enumerable:!0,get:function(){return t[r]}}),Object.defineProperty(e,s,i)}:function(e,t,r,s){void 0===s&&(s=r),e[s]=t[r]}),i=this&&this.__setModuleDefault||(Object.create?function(e,t){Object.defineProperty(e,"default",{enumerable:!0,value:t})}:function(e,t){e.default=t}),n=this&&this.__importStar||function(e){if(e&&e.__esModule)return e;var t={};if(null!=e)for(var r in e)"default"!==r&&Object.prototype.hasOwnProperty.call(e,r)&&s(t,e,r);return i(t,e),t},o=this&&this.__awaiter||function(e,t,r,s){return new(r||(r=Promise))((function(i,n){function o(e){try{c(s.next(e))}catch(e){n(e)}}function a(e){try{c(s.throw(e))}catch(e){n(e)}}function c(e){var t;e.done?i(e.value):(t=e.value,t instanceof r?t:new r((function(e){e(t)}))).then(o,a)}c((s=s.apply(e,t||[])).next())}))};Object.defineProperty(t,"__esModule",{value:!0}),t.fetchWithAuth=t.resolveHeadersConstructor=t.resolveFetch=void 0;const a=n(r(907));t.resolveFetch=e=>{let t;return t=e||("undefined"==typeof fetch?a.default:fetch),(...e)=>t(...e)},t.resolveHeadersConstructor=()=>"undefined"==typeof Headers?a.Headers:Headers,t.fetchWithAuth=(e,r,s)=>{const i=(0,t.resolveFetch)(s),n=(0,t.resolveHeadersConstructor)();return(t,s)=>o(void 0,void 0,void 0,(function*(){var o;const a=null!==(o=yield r())&&void 0!==o?o:e;let c=new n(null==s?void 0:s.headers);return c.has("apikey")||c.set("apikey",e),c.has("Authorization")||c.set("Authorization",`Bearer ${a}`),i(t,Object.assign(Object.assign({},s),{headers:c}))}))}},793:function(e,t){var r=this&&this.__awaiter||function(e,t,r,s){return new(r||(r=Promise))((function(i,n){function o(e){try{c(s.next(e))}catch(e){n(e)}}function a(e){try{c(s.throw(e))}catch(e){n(e)}}function c(e){var t;e.done?i(e.value):(t=e.value,t instanceof r?t:new r((function(e){e(t)}))).then(o,a)}c((s=s.apply(e,t||[])).next())}))};Object.defineProperty(t,"__esModule",{value:!0}),t.applySettingDefaults=t.isBrowser=t.stripTrailingSlash=t.uuid=void 0,t.uuid=function(){return"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,(function(e){var t=16*Math.random()|0;return("x"==e?t:3&t|8).toString(16)}))},t.stripTrailingSlash=function(e){return e.replace(/\/$/,"")},t.isBrowser=()=>"undefined"!=typeof window,t.applySettingDefaults=function(e,t){const{db:s,auth:i,realtime:n,global:o}=e,{db:a,auth:c,realtime:l,global:h}=t,u={db:Object.assign(Object.assign({},a),s),auth:Object.assign(Object.assign({},c),i),realtime:Object.assign(Object.assign({},l),n),global:Object.assign(Object.assign({},h),o),accessToken:()=>r(this,void 0,void 0,(function*(){return""}))};return e.accessToken?u.accessToken=e.accessToken:delete u.accessToken,u}},560:(e,t)=>{Object.defineProperty(t,"__esModule",{value:!0}),t.version=void 0,t.version="2.49.4"}},n={};function o(e){var t=n[e];if(void 0!==t)return t.exports;var r=n[e]={exports:{}};return i[e].call(r.exports,r,r.exports,o),r.exports}return o.m=i,t=Object.getPrototypeOf?e=>Object.getPrototypeOf(e):e=>e.__proto__,o.t=function(r,s){if(1&s&&(r=this(r)),8&s)return r;if("object"==typeof r&&r){if(4&s&&r.__esModule)return r;if(16&s&&"function"==typeof r.then)return r}var i=Object.create(null);o.r(i);var n={};e=e||[null,t({}),t([]),t(t)];for(var a=2&s&&r;"object"==typeof a&&!~e.indexOf(a);a=t(a))Object.getOwnPropertyNames(a).forEach((e=>n[e]=()=>r[e]));return n.default=()=>r,o.d(i,n),i},o.d=(e,t)=>{for(var r in t)o.o(t,r)&&!o.o(e,r)&&Object.defineProperty(e,r,{enumerable:!0,get:t[r]})},o.f={},o.e=e=>Promise.all(Object.keys(o.f).reduce(((t,r)=>(o.f[r](e,t),t)),[])),o.u=e=>e+".supabase.js",o.g=function(){if("object"==typeof globalThis)return globalThis;try{return this||new Function("return this")()}catch(e){if("object"==typeof window)return window}}(),o.o=(e,t)=>Object.prototype.hasOwnProperty.call(e,t),r={},s="supabase:",o.l=(e,t,i,n)=>{if(r[e])r[e].push(t);else{var a,c;if(void 0!==i)for(var l=document.getElementsByTagName("script"),h=0;h<l.length;h++){var u=l[h];if(u.getAttribute("src")==e||u.getAttribute("data-webpack")==s+i){a=u;break}}a||(c=!0,(a=document.createElement("script")).charset="utf-8",a.timeout=120,o.nc&&a.setAttribute("nonce",o.nc),a.setAttribute("data-webpack",s+i),a.src=e),r[e]=[t];var d=(t,s)=>{a.onerror=a.onload=null,clearTimeout(f);var i=r[e];if(delete r[e],a.parentNode&&a.parentNode.removeChild(a),i&&i.forEach((e=>e(s))),t)return t(s)},f=setTimeout(d.bind(null,void 0,{type:"timeout",target:a}),12e4);a.onerror=d.bind(null,a.onerror),a.onload=d.bind(null,a.onload),c&&document.head.appendChild(a)}},o.r=e=>{"undefined"!=typeof Symbol&&Symbol.toStringTag&&Object.defineProperty(e,Symbol.toStringTag,{value:"Module"}),Object.defineProperty(e,"__esModule",{value:!0})},(()=>{var e;o.g.importScripts&&(e=o.g.location+"");var t=o.g.document;if(!e&&t&&(t.currentScript&&"SCRIPT"===t.currentScript.tagName.toUpperCase()&&(e=t.currentScript.src),!e)){var r=t.getElementsByTagName("script");if(r.length)for(var s=r.length-1;s>-1&&(!e||!/^http(s?):/.test(e));)e=r[s--].src}if(!e)throw new Error("Automatic publicPath is not supported in this browser");e=e.replace(/#.*$/,"").replace(/\?.*$/,"").replace(/\/[^\/]+$/,"/"),o.p=e})(),(()=>{var e={792:0};o.f.j=(t,r)=>{var s=o.o(e,t)?e[t]:void 0;if(0!==s)if(s)r.push(s[2]);else{var i=new Promise(((r,i)=>s=e[t]=[r,i]));r.push(s[2]=i);var n=o.p+o.u(t),a=new Error;o.l(n,(r=>{if(o.o(e,t)&&(0!==(s=e[t])&&(e[t]=void 0),s)){var i=r&&("load"===r.type?"missing":r.type),n=r&&r.target&&r.target.src;a.message="Loading chunk "+t+" failed.\n("+i+": "+n+")",a.name="ChunkLoadError",a.type=i,a.request=n,s[1](a)}}),"chunk-"+t,t)}};var t=(t,r)=>{var s,i,[n,a,c]=r,l=0;if(n.some((t=>0!==e[t]))){for(s in a)o.o(a,s)&&(o.m[s]=a[s]);c&&c(o)}for(t&&t(r);l<n.length;l++)i=n[l],o.o(e,i)&&e[i]&&e[i][0](),e[i]=0},r=self.webpackChunksupabase=self.webpackChunksupabase||[];r.forEach(t.bind(null,0)),r.push=t.bind(null,r.push.bind(r))})(),o(440)})()));</script>
 
 <script>
 (function(){
   "use strict";
 
-  // ---------- the apps ----------
-  // path = where each app already lives on this same site (github.io address).
-  // Nothing in the apps themselves is changed: each still works at its own
-  // address. If a repository is ever renamed, its path here is the one thing
-  // to change. light / dark = that app's own page colour, used for its tab.
-  var APPS = [
-    {id: "database", name: "Database", short: "Database", path: "/Database/", light: "#f2f4f7", dark: "#12161b"},
-    {id: "install", name: "Install Tracker", short: "Install", path: "/Install-Tracker/", light: "#f4f1e9", dark: "#12161d"},
-    {id: "field", name: "Field Engineering", short: "Field Eng", path: "/Field-Engineering-Tracker/", light: "#f2f4f7", dark: "#12161b"}
+  // ---------- which Supabase project ----------
+  // The same config.js as the Equipment Database (or the Install Tracker) works
+  // here unchanged: all three use one project, which is why one login covers them.
+  var RAW_CFG = window.FET_CLOUD || window.EQDB_CLOUD || window.ITDB_CLOUD;
+  var CFG = (RAW_CFG && /^https?:\/\//.test(String(RAW_CFG.url || "")) && RAW_CFG.anonKey && !/^PASTE/.test(String(RAW_CFG.anonKey))) ? RAW_CFG : null;
+  var SUPABASE_CDN = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js";
+
+  // ---------- the columns ----------
+  // From the Equipment Database - shown here, never changed from here.
+  var DB_COLS = [
+    {key: "barcode", label: "BarCode", w: 110, mono: true},
+    {key: "manufacturer", label: "Manufacturer", w: 130},
+    {key: "model", label: "Model", w: 150},
+    {key: "deviceType", label: "Description", w: 230}
   ];
-  // Which tabs an account type gets (the Database's account types). Any type
-  // not listed here gets every tab. This only decides what is SHOWN: each app
-  // still enforces its own rules about who may open it.
-  var TABS_FOR_ROLE = {
-    driver: ["database"],                 // drivers: their deliveries page, full-screen, no tab strip
-    dashboard: ["database", "install"]    // dashboard-view logins have no Field Engineering access
+  // Filled in here, one set per device. kind: "ip" is checked as an IPv4 address,
+  // "mac" is tidied to AA:BB:CC:DD:EE:FF; unique = two devices shouldn't share it.
+  var FE_COLS = [
+    {key: "serialNumber", label: "Serial Number", w: 150, mono: true},
+    {key: "mac", label: "MAC Address", w: 150, mono: true, kind: "mac", unique: true},
+    {key: "location", label: "Location", w: 150, list: "locList"},
+    {key: "deviceId", label: "Device ID", w: 110},
+    {key: "firmware", label: "Firmware Version", w: 130},
+    {key: "hostName", label: "Host Name", w: 150, mono: true, unique: true},
+    {key: "ip", label: "IP Address", w: 130, mono: true, kind: "ip", unique: true},
+    {key: "subnet", label: "Subnet Mask", w: 130, mono: true, kind: "ip"},
+    {key: "gateway", label: "Gateway", w: 130, mono: true, kind: "ip"},
+    {key: "dns1", label: "DNS 1", w: 130, mono: true, kind: "ip"},
+    {key: "dns2", label: "DNS 2", w: 130, mono: true, kind: "ip"},
+    {key: "login", label: "Login", w: 120},
+    {key: "password", label: "Password", w: 130, secret: true},
+    {key: "notes", label: "Notes", w: 240, spell: true}
+  ];
+  var STATUSES = [["", "Not started"], ["in_progress", "In progress"], ["done", "Done"], ["na", "N/A"]];
+  var LINES_SHOWN = 150;   // lines drawn at once; search and filters still cover them all
+  var SPLIT_MAX = 24;      // "Split" makes every line in one go up to this many
+
+  var S = {
+    sb: null, user: null, role: "staff", lockedJobId: null, canEdit: false,
+    jobs: [], job: null,
+    rows: [],            // the job's equipment lines from the Database: {id, pos, data}
+    dev: {},             // "rowId|unit" -> the saved field-engineering record
+    pending: {},         // "rowId|unit" -> {patch: {field: value}, deleted: true|false} not yet saved
+    saving: null, saveSeq: 0, saveTimer: null, retryTimer: null, channel: null, pollTimer: null, liveTimer: null,
+    filter: "all", search: "", sort: null, limit: LINES_SHOWN, showSecrets: false, tableMissing: false,
+    clientId: "f" + Math.random().toString(36).slice(2, 10)
   };
-  var K = {tab: "apps.tab", role: "apps.role"};
+  var K = {user: "fet.user", role: "fet.role", jobs: "fet.jobs", lastJob: "fet.lastJob", cache: "fet.cache.", pending: "fet.pending."};
 
   function $(id){ return document.getElementById(id); }
-  function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
-  function lsSet(k, v){ try{ localStorage.setItem(k, v); }catch(e){} }
-  function byId(id){ for (var i = 0; i < APPS.length; i++) if (APPS[i].id === id) return APPS[i]; return null; }
+  function esc(s){ return String(s === undefined || s === null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+  function lsGet(k){ try{ return window.localStorage.getItem(k); }catch(e){ return null; } }
+  function lsSet(k, v){ try{ window.localStorage.setItem(k, v); return true; }catch(e){ return false; } }
+  function lsDel(k){ try{ window.localStorage.removeItem(k); }catch(e){} }
+  function lsJson(k){ try{ return JSON.parse(lsGet(k) || "null"); }catch(e){ return null; } }
+  function isNetworkProblem(e){
+    if (navigator.onLine === false) return true;
+    var m = String((e && e.message) || e || "");
+    return /failed to fetch|networkerror|load failed|network request failed|fetch failed|timeout/i.test(m);
+  }
+  var snackTimer = null;
+  function snack(text){
+    var el = $("snackbar");
+    el.textContent = text; el.classList.add("show");
+    clearTimeout(snackTimer);
+    snackTimer = setTimeout(function(){ el.classList.remove("show"); }, 5000);
+  }
+  function setStatus(kind, text){
+    $("syncDot").className = "dot" + (kind === "busy" ? " busy" : kind === "bad" ? " bad" : "");
+    $("syncLabel").textContent = text;
+  }
+  function notice(text){ $("notice").textContent = text || ""; $("notice").hidden = !text; }
 
-  var active = null;      // id of the open tab
-  var role = null;        // the signed-in login's account type, when known (null = not known: show every tab)
-  var lastUid = null;     // who is signed in, as last seen
-  var epoch = 0;          // goes up every time the sign-in changes (in, out, or a different person)
-
-  // ---------- who is signed in ----------
-  // All three apps keep the Supabase sign-in in this browser's storage for the
-  // site, which is why one sign-in covers them. This page only READS it, to
-  // know when the sign-in changed and which account type to ask about.
-  function currentSession(){
-    try{
-      for (var i = 0; i < localStorage.length; i++){
-        var k = localStorage.key(i);
-        if (!/^sb-.+-auth-token$/.test(k)) continue;
-        var v = JSON.parse(localStorage.getItem(k) || "null");
-        if (v && v.currentSession) v = v.currentSession;
-        if (v && v.user && v.user.id && v.access_token) return {uid: String(v.user.id), token: String(v.access_token)};
+  // ---------- sign in ----------
+  var libPromise = null;
+  function loadSupabaseLib(){
+    if (window.supabase && window.supabase.createClient) return Promise.resolve();
+    if (libPromise) return libPromise;
+    libPromise = new Promise(function(resolve, reject){
+      // the library is built into this file, so it works without a download
+      var src = $("supabaseLibSource");
+      if (src && src.textContent){
+        try{ var inline = document.createElement("script"); inline.textContent = src.textContent; document.head.appendChild(inline); }catch(e){}
+        if (window.supabase && window.supabase.createClient){ resolve(); return; }
       }
-    }catch(e){}
-    return null;
-  }
-  function observe(){
-    var s = currentSession(), uid = s ? s.uid : null;
-    if (uid !== lastUid){ lastUid = uid; epoch++; }
-    refreshRole(s);
-    return s;
-  }
-
-  // ---------- the account type, for which tabs to show ----------
-  // Read from the same place the apps read it (the Database's eq_profiles),
-  // using the site's own config.js - the same file the apps load.
-  function cloudConfig(){
-    var c = window.EQDB_CLOUD || window.ITDB_CLOUD || window.FET_CLOUD;
-    return c && /^https?:\/\//.test(String(c.url || "")) && c.anonKey && !/^PASTE/.test(String(c.anonKey)) ? c : null;
-  }
-  var configReady = new Promise(function(done){
-    var i = 0;
-    (function next(){
-      if (cloudConfig() || i >= APPS.length || location.protocol === "file:") return done(cloudConfig());
       var s = document.createElement("script");
-      s.src = APPS[i++].path + "config.js"; s.onload = next; s.onerror = next;
+      s.src = SUPABASE_CDN;
+      s.onload = function(){ if (window.supabase && window.supabase.createClient) resolve(); else reject(new Error("sync library missing")); };
+      s.onerror = function(){ libPromise = null; reject(new Error("couldn't load the sync library")); };
       document.head.appendChild(s);
-    })();
-  });
-  var roleAsked = "";   // the sign-in token the account type was last asked with
-  var roleRetryAt = 0;  // when to ask again after a lookup that couldn't be reached (0 = no need)
-  var known = null;     // {uid, role} as last answered; remembered on the device so the tabs are right at once next time
-  try{ known = JSON.parse(lsGet(K.role) || "null"); }catch(e){}
-  function refreshRole(s){
-    if (!s){ roleAsked = ""; setRole(null); return; }
-    setRole(known && known.uid === s.uid ? known.role : null);
-    if (roleAsked === s.token && !(roleRetryAt && Date.now() >= roleRetryAt)) return;
-    roleAsked = s.token; roleRetryAt = 0;
-    configReady.then(function(c){
-      if (!c) return null;
-      return fetch(String(c.url).replace(/\/+$/, "") + "/rest/v1/eq_profiles?select=role&id=eq." + encodeURIComponent(s.uid),
-          {headers: {apikey: c.anonKey, Authorization: "Bearer " + s.token, Accept: "application/json"}, cache: "no-store"})
-        .then(function(r){
-          if (r.status === 401) return null;   // the sign-in has just expired: the open app renews it, and that asks again
-          if (!r.ok) throw new Error("status " + r.status);
-          return r.json();
-        })
-        // a login with no line in that table is treated as full access, as the apps treat it
-        .then(function(rows){ return Array.isArray(rows) ? String((rows[0] && rows[0].role) || "staff") : null; });
-    }).then(function(found){
-      if (!found || lastUid !== s.uid) return;   // couldn't tell (offline, sign-in just expired): keep what is showing
-      known = {uid: s.uid, role: found};
-      lsSet(K.role, JSON.stringify(known));
-      setRole(found);
-    }, function(){ roleRetryAt = Date.now() + 60000; });   // couldn't be reached: ask again in a minute
-  }
-  function allowedIds(){
-    var list = role && TABS_FOR_ROLE[role];
-    return list && list.length ? list : APPS.map(function(a){ return a.id; });
-  }
-  function setRole(r){
-    if (r === role && active) return;
-    role = r;
-    var ok = allowedIds();
-    APPS.forEach(function(a){ a.tab.hidden = ok.indexOf(a.id) === -1; });
-    document.body.classList.toggle("single", ok.length === 1);
-    if (active && ok.indexOf(active) === -1) activate(ok[0]);
-  }
-
-  // ---------- panes ----------
-  function clearPane(app){ while (app.pane.firstChild) app.pane.removeChild(app.pane.firstChild); app.frame = null; }
-  // Puts the app in its pane (first visit, or again after the sign-in changed).
-  function open(app){
-    clearPane(app);
-    app.epoch = epoch;
-    var f = document.createElement("iframe");
-    f.title = app.name;
-    f.setAttribute("allow", "camera; clipboard-write; fullscreen");
-    f.src = app.path;
-    // An app that hasn't been put on the site yet would show GitHub's "not found" page: say so plainly
-    // instead. The app loads meanwhile, kept out of sight for the moment it takes to find out.
-    f.style.visibility = "hidden";
-    app.pane.appendChild(f);
-    app.frame = f;
-    fetch(app.path, {method: "HEAD", cache: "no-store"}).then(function(r){
-      if (app.frame !== f) return;
-      if (r.status === 404) showMissing(app); else f.style.visibility = "";
-    }, function(){ f.style.visibility = ""; /* no connection: the app opens from its own offline copy */ });
-  }
-  function showMissing(app){
-    clearPane(app);
-    var box = document.createElement("div");
-    box.className = "msg";
-    box.innerHTML = '<div class="msg-card"><h1></h1><p>This tab looks for it at:</p><p><code></code></p>' +
-      '<p>Upload it to GitHub at that address (its own build folder has the steps), then press Try again. The other tabs are not affected.</p>' +
-      '<button type="button">Try again</button></div>';
-    box.querySelector("h1").textContent = app.name + " isn't on the site yet";
-    box.querySelector("code").textContent = location.origin + app.path;
-    box.querySelector("button").addEventListener("click", function(){ open(app); });
-    app.pane.appendChild(box);
-  }
-
-  function activate(id, focusIt){
-    observe();
-    var ok = allowedIds();
-    var app = byId(id);
-    if (!app || ok.indexOf(app.id) === -1) app = byId(ok[0]);
-    var prev = byId(active);
-    // Only the open tab can be signed in to or out of, so whatever the sign-in is as we leave it is what it is showing.
-    if (prev && prev !== app && prev.frame) prev.epoch = epoch;
-    active = app.id;
-    // First visit - or the sign-in changed since this tab was last looked at, so what it shows is stale.
-    if (!app.pane.firstChild || (app.frame && app.epoch !== epoch)) open(app);
-    APPS.forEach(function(a){
-      var on = a === app;
-      a.tab.setAttribute("aria-selected", on ? "true" : "false");
-      a.tab.tabIndex = on ? 0 : -1;
-      a.pane.classList.toggle("active", on);
     });
-    document.title = app.name + " - Apps";
-    lsSet(K.tab, app.id);
-    try{ history.replaceState(null, "", "#" + app.id); }catch(e){}
-    if (focusIt && app.frame){ try{ app.frame.contentWindow.focus(); }catch(e){} }
+    return libPromise;
+  }
+  function showLogin(message, isError){
+    $("login").hidden = false; $("app").hidden = true;
+    $("loginErr").textContent = isError ? message : "";
+    if (!isError && message) $("loginSub").textContent = message;
+    $("loginBtn").disabled = !CFG;
+  }
+  function boot(){
+    $("loginForm").addEventListener("submit", function(ev){
+      ev.preventDefault();
+      if (!S.sb) return;
+      $("loginBtn").disabled = true; $("loginErr").textContent = "";
+      S.sb.auth.signInWithPassword({email: $("loginEmail").value.trim(), password: $("loginPassword").value}).then(function(r){
+        $("loginBtn").disabled = false;
+        if (r.error){ $("loginErr").textContent = /invalid login/i.test(r.error.message) ? "That email and password don't match." : r.error.message; return; }
+        $("loginPassword").value = "";
+        return afterSignIn(r.data.user);
+      }).catch(function(e){
+        $("loginBtn").disabled = false;
+        $("loginErr").textContent = isNetworkProblem(e) ? "You're offline - signing in needs an internet connection." : "Couldn't sign in: " + (e && e.message ? e.message : e);
+      });
+    });
+    if (!CFG){
+      showLogin("This copy isn't connected yet: config.js is missing from the site. Copy config.js from the Equipment Database site into this one (see the read-me).", true);
+      return;
+    }
+    showLogin("Checking your sign-in...");
+    loadSupabaseLib().then(function(){
+      // the same settings as the Equipment Database, so a sign-in there is a sign-in here
+      S.sb = window.supabase.createClient(CFG.url, CFG.anonKey, {
+        auth: {persistSession: true, autoRefreshToken: true, detectSessionInUrl: false},
+        realtime: {params: {eventsPerSecond: 20}}
+      });
+      S.sb.auth.onAuthStateChange(function(evt){
+        if (evt === "SIGNED_OUT" && S.user){ leaveJob(); S.user = null; showLogin("You were signed out. Sign in again."); }
+      });
+      return S.sb.auth.getSession();
+    }).then(function(r){
+      var session = r && r.data && r.data.session;
+      if (session && session.user) return afterSignIn(session.user);
+      var saved = lsJson(K.user);
+      if (navigator.onLine === false && saved) return afterSignIn(saved, true);   // offline start on a device that was signed in
+      showLogin("Sign in with the same email and password as the Equipment Database and the Install Tracker.");
+    }).catch(function(e){
+      showLogin("Couldn't start: " + (e && e.message ? e.message : e), true);
+    });
+  }
+  // Who is this, and what may they do here? The roles are the Equipment
+  // Database's own (its eq_profiles table), since the equipment comes from it:
+  //   full access (Admin, Warehouse, Staff) and PC  - fill everything in
+  //   Viewer                                        - look only
+  //   Driver, Dashboard view                        - no access
+  function afterSignIn(user, offline){
+    S.user = {id: user.id, email: user.email || ""};
+    lsSet(K.user, JSON.stringify(S.user));
+    $("userEmail").textContent = S.user.email;
+    var profileReq = offline ? Promise.resolve({data: lsJson(K.role), cached: true})
+      : Promise.resolve().then(function(){ return S.sb.from("eq_profiles").select("*").eq("id", S.user.id).maybeSingle(); });
+    return profileReq.then(function(pr){
+      if (pr.error) throw pr.error;
+      var p = pr.data || {};
+      if (!pr.cached) lsSet(K.role, JSON.stringify({role: p.role || "", job_id: p.job_id || null, staff_kind: p.staff_kind || ""}));
+      return p;
+    }, function(){ return lsJson(K.role) || {}; }).then(function(p){
+      S.role = p.role || "staff";
+      S.lockedJobId = (S.role === "viewer" || S.role === "tech") ? (p.job_id || null) : null;
+      S.canEdit = S.role === "staff" || S.role === "tech";
+      $("login").hidden = true; $("app").hidden = false;
+      var tag = S.role === "viewer" ? "Viewer - read only" : S.role === "tech" ? "PC" : p.staff_kind === "admin" ? "Admin" : p.staff_kind === "warehouse" ? "Warehouse" : "";
+      $("roleTag").textContent = tag; $("roleTag").hidden = !tag;
+      $("jobsBtn").hidden = !!S.lockedJobId;
+      if (S.role === "driver" || S.role === "dashboard"){
+        $("jobsView").hidden = true; $("jobView").hidden = true; $("jobsBtn").hidden = true;
+        notice("This login is a " + (S.role === "driver" ? "Driver" : "Dashboard view") + " account, which doesn't have the Field Engineering Tracker. Ask an Admin if you need it.");
+        setStatus("ok", "Signed in");
+        return;
+      }
+      notice("");
+      if (S.lockedJobId) return openJobById(S.lockedJobId);
+      var last = lsGet(K.lastJob);
+      return showJobs().then(function(){
+        var job = last && S.jobs.filter(function(j){ return j.id === last; })[0];
+        if (job && !S.job) openJob(job);
+      });
+    });
+  }
+  function signOut(){
+    if (S.saving){ S.saving.then(signOut); return; }
+    var waiting = Object.keys(S.pending).length;
+    if (waiting && !confirm(waiting + " line" + (waiting === 1 ? " has" : "s have") + " changes that haven't reached the database yet (no connection?).\n\nSign out anyway and lose them?")) return;
+    leaveJob();
+    // nothing about the jobs stays on a device that has been signed out of
+    try{
+      var del = [];
+      for (var i = 0; i < localStorage.length; i++){ var k = localStorage.key(i); if (k && k.indexOf("fet.") === 0) del.push(k); }
+      del.forEach(lsDel);
+    }catch(e){}
+    var u = S.user; S.user = null; S.jobs = [];
+    Promise.resolve(S.sb ? S.sb.auth.signOut() : null).then(function(){}, function(){}).then(function(){
+      showLogin("Signed out" + (u && u.email ? " (" + u.email + ")" : "") + ". This also signs out of the Database and the Install Tracker in this browser.");
+    });
   }
 
-  // ---------- build the page ----------
-  if (location.protocol === "file:"){
-    // Opened straight from a folder on the PC: the apps can't share a sign-in that way.
-    $("tabs").hidden = true;
-    $("panes").innerHTML = '<div class="msg"><div class="msg-card"><h1>This page works once it is on GitHub</h1>' +
-      '<p>It shows the three apps from the same site it is on, so it has to be uploaded next to them (see the read-me). Opening the file from a folder on the PC can\'t do that.</p></div></div>';
-    return;
+  // ---------- reading from the database ----------
+  // The database hands back at most 1000 rows per request, so long lists are asked for page by page.
+  function fetchAll(build){
+    var all = [];
+    function next(from){
+      return build().range(from, from + 999).then(function(r){
+        if (r.error) throw r.error;
+        all = all.concat(r.data || []);
+        return (r.data || []).length === 1000 ? next(from + 1000) : all;
+      });
+    }
+    return Promise.resolve().then(function(){ return next(0); });
   }
-  APPS.forEach(function(app){
-    var t = document.createElement("button");
-    t.type = "button"; t.className = "tab"; t.id = "tab-" + app.id;
-    t.setAttribute("role", "tab"); t.setAttribute("aria-selected", "false"); t.setAttribute("aria-controls", "pane-" + app.id);
-    t.style.setProperty("--l", app.light); t.style.setProperty("--d", app.dark);
-    t.innerHTML = '<span class="long"></span><span class="short"></span>';
-    t.querySelector(".long").textContent = app.name; t.querySelector(".short").textContent = app.short;
-    t.title = app.name;
-    t.addEventListener("click", function(){ activate(app.id, true); });
-    $("tabs").insertBefore(t, $("tabSpacer"));
-    var p = document.createElement("div");
-    p.className = "pane"; p.id = "pane-" + app.id;
-    p.setAttribute("role", "tabpanel"); p.setAttribute("aria-labelledby", t.id);
-    $("panes").appendChild(p);
-    app.tab = t; app.pane = p; app.frame = null; app.epoch = -1;
+  function isMissingTable(e){
+    var m = String((e && e.message) || "") + " " + String((e && e.code) || "");
+    return /fe_devices|fe_save_device/i.test(m) && /does not exist|could not find|not found|PGRST20[25]|42P01|42883/i.test(m);
+  }
+
+  // ---------- jobs ----------
+  function jobLabel(j){ return (j.meta && j.meta.project) || j.name || "Untitled job"; }
+  function showJobs(){
+    leaveJob();
+    $("jobView").hidden = true; $("jobsView").hidden = false;
+    $("subhead").textContent = "Pick a job. Its equipment comes from the Equipment Database.";
+    var cached = lsJson(K.jobs);
+    if (cached && !S.jobs.length){ S.jobs = cached; renderJobs(); }
+    $("jobsMsg").textContent = S.jobs.length ? "" : "Loading jobs...";
+    setStatus("busy", "Loading jobs...");
+    return fetchAll(function(){ return S.sb.from("eq_jobs").select("*").eq("deleted", false).order("name", {ascending: true}).order("id", {ascending: true}); }).then(function(list){
+      S.jobs = list.map(function(j){ return {id: j.id, name: j.name, meta: j.meta || {}, archived: !!j.archived}; });
+      lsSet(K.jobs, JSON.stringify(S.jobs));
+      renderJobs();
+      setStatus("ok", "Ready");
+      sendStoredPending();
+    }).catch(function(e){
+      renderJobs();
+      if (isNetworkProblem(e)) setStatus("bad", "Offline - showing the jobs saved on this device");
+      else { setStatus("bad", "Couldn't load jobs"); $("jobsMsg").textContent = "Couldn't load the jobs: " + (e && e.message ? e.message : e); }
+    });
+  }
+  function renderJobs(){
+    var words = $("jobSearch").value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    var showArchived = $("jobArchived").checked;
+    var list = S.jobs.filter(function(j){
+      if (j.archived && !showArchived && !words.length) return false;
+      var text = [jobLabel(j), j.name, j.meta.projectNumber, j.meta.address, j.meta.vendor].join(" ").toLowerCase();
+      return words.every(function(w){ return text.indexOf(w) !== -1; });
+    }).sort(function(a, b){ return jobLabel(a).localeCompare(jobLabel(b), undefined, {numeric: true, sensitivity: "base"}); });
+    $("jobList").innerHTML = list.map(function(j){
+      var detail = [j.meta.projectNumber ? "Job # " + j.meta.projectNumber : "", j.meta.address || ""].filter(Boolean).join(" · ");
+      return '<button type="button" class="job-card card" data-job="' + esc(j.id) + '">' +
+        '<span class="jn">' + esc(jobLabel(j)) + '</span>' +
+        (detail ? '<span class="jd">' + esc(detail) + '</span>' : '') +
+        (j.archived ? '<span class="ja">Archived</span>' : '') + '</button>';
+    }).join("");
+    $("jobsMsg").textContent = list.length ? "" : (S.jobs.length ? "No job matches that." : "No jobs to show.");
+  }
+  function openJobById(id){
+    var known = S.jobs.filter(function(j){ return j.id === id; })[0];
+    if (known) return openJob(known);
+    return Promise.resolve().then(function(){ return S.sb.from("eq_jobs").select("*").eq("id", id).maybeSingle(); }).then(function(r){
+      if (r.error) throw r.error;
+      if (!r.data){ notice("The job this login is assigned to wasn't found. Ask an Admin."); return; }
+      return openJob({id: r.data.id, name: r.data.name, meta: r.data.meta || {}, archived: !!r.data.archived});
+    }).catch(function(e){
+      var c = lsJson(K.cache + id);
+      if (c && c.job) return openJob(c.job);
+      notice(isNetworkProblem(e) ? "You're offline, and this job hasn't been opened on this device before." : "Couldn't open the job: " + (e && e.message ? e.message : e));
+    });
+  }
+
+  // ---------- one job ----------
+  function leaveJob(){
+    clearTimeout(S.saveTimer); clearTimeout(S.retryTimer); clearTimeout(S.liveTimer); clearInterval(S.pollTimer);
+    if (S.channel && S.sb){ try{ S.sb.removeChannel(S.channel); }catch(e){} }
+    S.channel = null; S.job = null; S.rows = []; S.dev = {}; S.pending = {};
+  }
+  function writeCache(){
+    if (!S.job) return;
+    lsSet(K.cache + S.job.id, JSON.stringify({job: S.job, rows: S.rows, dev: S.dev, savedAt: new Date().toISOString()}));
+  }
+  function writePending(){
+    if (!S.job) return;
+    if (Object.keys(S.pending).length) lsSet(K.pending + S.job.id, JSON.stringify(S.pending)); else lsDel(K.pending + S.job.id);
+  }
+  function openJob(job){
+    leaveJob();
+    S.job = job; S.filter = "all"; S.search = ""; S.sort = null; S.limit = LINES_SHOWN; S.tableMissing = false;
+    lsSet(K.lastJob, job.id);
+    $("jobsView").hidden = true; $("jobView").hidden = false;
+    $("search").value = "";
+    Array.prototype.forEach.call($("chips").querySelectorAll("button"), function(b){ b.classList.toggle("active", b.dataset.st === "all"); });
+    $("jobTitle").textContent = jobLabel(job);
+    $("jobDetail").textContent = [job.meta.projectNumber ? "Job # " + job.meta.projectNumber : "", job.meta.address || ""].filter(Boolean).join(" · ");
+    $("subhead").textContent = S.canEdit ? "Equipment from the Database. Fill in the details for each device - they save as you type."
+      : "Equipment from the Database, with the details recorded for each device. This login can look but not change.";
+    // what this device already has: shows at once, and is all there is when offline
+    var c = lsJson(K.cache + job.id);
+    if (c){ S.rows = c.rows || []; S.dev = c.dev || {}; }
+    S.pending = lsJson(K.pending + job.id) || {};
+    render();
+    return loadJob(true).then(function(){ subscribe(); flushSoon(0); sendStoredPending(); });
+  }
+  function loadJob(first){
+    if (!S.job) return Promise.resolve();
+    var jobId = S.job.id, seq = S.saveSeq;
+    if (first) setStatus("busy", "Loading...");
+    return Promise.all([
+      fetchAll(function(){ return S.sb.from("eq_rows").select("id,data,pos").eq("job_id", jobId).eq("deleted", false).order("pos", {ascending: true}).order("id", {ascending: true}); }),
+      fetchAll(function(){ return S.sb.from("fe_devices").select("*").eq("job_id", jobId).order("id", {ascending: true}); }).then(null, function(e){
+        if (!isMissingTable(e)) throw e;
+        S.tableMissing = true;
+        return [];
+      })
+    ]).then(function(res){
+      if (!S.job || S.job.id !== jobId) return;
+      // something was saved while this was being read, so what came back may be
+      // from before it - read again rather than show the older values
+      if (seq !== S.saveSeq || S.saving){ reloadSoon(); return; }
+      S.rows = res[0].map(function(r){ return {id: r.id, pos: r.pos, data: r.data || {}}; });
+      var dev = {};
+      res[1].forEach(function(d){ dev[d.row_id + "|" + d.unit] = d; });
+      S.dev = dev;
+      writeCache();
+      notice(S.tableMissing ? MISSING_TABLE : "");
+      render();
+      showSaveState();
+    }).catch(function(e){
+      if (!S.job || S.job.id !== jobId) return;
+      if (isNetworkProblem(e)){ setStatus("bad", "Offline - showing what this device has" + pendingNote()); return; }
+      setStatus("bad", "Couldn't load");
+      notice("Couldn't load this job: " + (e && e.message ? e.message : e));
+    });
+  }
+  // Live: another engineer's change shows here within a second or two, and a
+  // change to the equipment itself (made in the Database) brings its line up to date.
+  function subscribe(){
+    if (!S.job || !S.sb) return;
+    var jobId = S.job.id;
+    try{
+      S.channel = S.sb.channel("fet-" + jobId + "-" + S.clientId)
+        .on("postgres_changes", {event: "*", schema: "public", table: "fe_devices", filter: "job_id=eq." + jobId}, function(msg){
+          var d = msg && msg.new;
+          if (!d || !d.row_id || !S.job || S.job.id !== jobId) return;
+          var key = d.row_id + "|" + d.unit, have = S.dev[key];
+          if (have && have.updated_at && d.updated_at && String(d.updated_at) < String(have.updated_at)) return;   // older than what is here
+          S.dev[key] = d;
+          renderSoon();
+        })
+        .on("postgres_changes", {event: "*", schema: "public", table: "eq_rows", filter: "job_id=eq." + jobId}, function(){ reloadSoon(); })
+        .subscribe(function(){});
+    }catch(e){ S.channel = null; }
+    clearInterval(S.pollTimer);
+    // a tablet's live connection often drops; once a minute the job is read again anyway
+    S.pollTimer = setInterval(function(){ if (!document.hidden && !S.saving && !Object.keys(S.pending).length) loadJob(false); }, 60000);
+  }
+  function reloadSoon(){ clearTimeout(S.liveTimer); S.liveTimer = setTimeout(function(){ loadJob(false); }, 1200); }
+  var renderTimer = null;
+  function renderSoon(){ clearTimeout(renderTimer); renderTimer = setTimeout(function(){ writeCache(); render(); }, 150); }
+
+  // ---------- the lines ----------
+  // One line per device. An equipment line of several (QTY 4) is one line until
+  // it is split; then each of the four has its own.
+  function isDeleted(key){
+    var p = S.pending[key];
+    if (p && (p.deleted === true || p.deleted === false)) return p.deleted;
+    return !!(S.dev[key] && S.dev[key].deleted);
+  }
+  function feOf(key){
+    var saved = (S.dev[key] && S.dev[key].data) || {}, p = S.pending[key];
+    return p && p.patch ? Object.assign({}, saved, p.patch) : saved;
+  }
+  function qtyOf(row){ var n = Number(row.data.totalQty); return n > 0 ? Math.floor(n) : 0; }
+  function buildLines(){
+    var units = {};
+    function add(key){
+      if (isDeleted(key)) return;
+      var i = key.lastIndexOf("|"), rowId = key.slice(0, i), u = Number(key.slice(i + 1));
+      if (!(u >= 1)) return;
+      (units[rowId] = units[rowId] || {})[u] = true;
+    }
+    Object.keys(S.dev).forEach(add);
+    Object.keys(S.pending).forEach(add);
+    var lines = [];
+    S.rows.forEach(function(r){
+      var u = units[r.id] || {};
+      u[1] = true;   // the first line is always there
+      var list = Object.keys(u).map(Number).sort(function(a, b){ return a - b; });
+      list.forEach(function(n, i){ lines.push({key: r.id + "|" + n, row: r, unit: n, pos: i + 1, count: list.length}); });
+    });
+    return lines;
+  }
+  // the serial number shown: what was typed here, else the one in the Database (first line only)
+  function serialOf(line, fe){
+    if (fe.serialNumber) return fe.serialNumber;
+    return line.unit === 1 ? String(line.row.data.serialNumber || "") : "";
+  }
+  // what to call a line in a message: its barcode (or make and model), and which one when there are several
+  function lineName(l){
+    var d = l.row.data, name = d.barcode || [d.manufacturer, d.model].filter(Boolean).join(" ") || "another line";
+    return l.count > 1 ? name + " (" + l.pos + " of " + l.count + ")" : name;
+  }
+  function valueOf(line, fe, key){
+    if (key === "serialNumber") return serialOf(line, fe);
+    if (key === "qty") return line.count > 1 ? line.pos + " of " + line.count : (qtyOf(line.row) || "");
+    if (key === "status") return fe.status || "";
+    var db = DB_COLS.filter(function(c){ return c.key === key; })[0];
+    return String((db ? line.row.data[key] : fe[key]) == null ? "" : (db ? line.row.data[key] : fe[key]));
+  }
+  function ipKey(v){
+    var m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(String(v).trim());
+    return m ? m.slice(1).map(function(n){ return ("00" + n).slice(-3); }).join(".") : "~" + String(v).toLowerCase();
+  }
+  function visibleLines(lines){
+    var words = S.search.toLowerCase().split(/\s+/).filter(Boolean);
+    var out = lines.filter(function(l){
+      var fe = feOf(l.key);
+      if (S.filter !== "all" && (fe.status || "") !== S.filter) return false;
+      if (!words.length) return true;
+      var d = l.row.data;
+      var text = [d.barcode, d.manufacturer, d.model, d.deviceType, serialOf(l, fe)].concat(FE_COLS.filter(function(c){ return !c.secret; }).map(function(c){ return fe[c.key]; })).join(" \n ").toLowerCase();
+      return words.every(function(w){ return text.indexOf(w) !== -1; });
+    });
+    if (S.sort){
+      var key = S.sort.key, dir = S.sort.dir, col = FE_COLS.filter(function(c){ return c.key === key; })[0];
+      var val = function(l){ var v = valueOf(l, feOf(l.key), key); return col && col.kind === "ip" ? ipKey(v) : String(v).toLowerCase(); };
+      out = out.map(function(l, i){ return {l: l, v: val(l), i: i}; }).sort(function(a, b){
+        // blanks last, whichever way the column is sorted
+        if (!a.v !== !b.v) return a.v ? -1 : 1;
+        return (a.v.localeCompare(b.v, undefined, {numeric: true}) * dir) || (a.i - b.i);
+      }).map(function(x){ return x.l; });
+    }
+    return out;
+  }
+
+  // ---------- drawing ----------
+  function headHtml(){
+    var sticky = ["s1", "s2", "s3", "s4"], n = 0;
+    function th(key, label, w, cls){
+      var arrow = S.sort && S.sort.key === key ? '<span class="arrow">' + (S.sort.dir === 1 ? "▲" : "▼") + '</span>' : "";
+      return '<th data-sort="' + key + '" class="' + cls + (n < 4 ? " " + sticky[n] : "") + '" style="min-width:' + w + 'px;width:' + w + 'px">' + esc(label) + arrow + '</th>';
+    }
+    var html = th("status", "Status", 120, "fe"); n++;
+    html += th("barcode", "BarCode", 110, ""); n++;
+    html += th("manufacturer", "Manufacturer", 130, ""); n++;
+    html += th("model", "Model", 150, ""); n++;
+    html += th("deviceType", "Description", 230, "");
+    html += th("qty", "QTY", 96, "");
+    FE_COLS.forEach(function(c){ html += th(c.key, c.label, c.w, "fe"); });
+    return "<tr>" + html + "</tr>";
+  }
+  function lineHtml(l){
+    var d = l.row.data, fe = feOf(l.key), st = fe.status || "", qty = qtyOf(l.row);
+    var ro = S.canEdit && !S.tableMissing ? "" : " readonly";
+    var qtyCell = '<span class="qty"><span>' + esc(valueOf(l, fe, "qty")) + '</span>';
+    if (S.canEdit && !S.tableMissing){
+      if (l.unit === 1 && qty > l.count){
+        qtyCell += '<button type="button" class="mini" data-act="add" title="Add a line for another one of these ' + qty + '">+ line</button>';
+        if (l.count === 1 && qty <= SPLIT_MAX) qtyCell += '<button type="button" class="mini" data-act="split" title="Make a line for each of the ' + qty + '">Split</button>';
+      }
+      if (l.unit > 1) qtyCell += '<button type="button" class="mini" data-act="remove" title="Remove this line" aria-label="Remove this line">×</button>';
+    }
+    qtyCell += '</span>';
+    var html = '<td class="c-status s1" data-label="Status"><select data-f="status" class="st-' + (st || "none") + '"' + (ro ? " disabled" : "") + '>' +
+      STATUSES.map(function(s){ return '<option value="' + s[0] + '"' + (s[0] === st ? " selected" : "") + '>' + s[1] + '</option>'; }).join("") + '</select></td>' +
+      '<td class="ro c-barcode mono s2" data-label="BarCode">' + esc(d.barcode) + '</td>' +
+      '<td class="ro c-manufacturer s3" data-label="Manufacturer">' + esc(d.manufacturer) + '</td>' +
+      '<td class="ro c-model s4" data-label="Model">' + esc(d.model) + '</td>' +
+      '<td class="ro c-deviceType" data-label="Description">' + esc(d.deviceType) + '</td>' +
+      '<td class="ro c-qty" data-label="QTY">' + qtyCell + '</td>';
+    FE_COLS.forEach(function(c){
+      var v = valueOf(l, fe, c.key);
+      var cls = (c.mono ? "mono " : "") + (c.secret ? "secret " + (S.showSecrets ? "" : "masked ") : "") + (c.key === "serialNumber" && !fe.serialNumber && v ? "from-db" : "");
+      html += '<td class="c-' + c.key + '" data-label="' + esc(c.label) + '"><input type="text" data-f="' + c.key + '" value="' + esc(v) + '"' + ro +
+        ' class="' + cls.trim() + '"' + (c.list ? ' list="' + c.list + '"' : "") + (c.kind === "ip" ? ' inputmode="decimal"' : "") +
+        ' autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="' + (c.spell ? "true" : "false") + '" data-lpignore="true" data-1p-ignore aria-label="' + esc(c.label) + '"></td>';
+    });
+    return '<tr data-key="' + esc(l.key) + '" class="' + (st === "na" ? "is-na" : "") + '">' + html + '</tr>';
+  }
+  function render(){
+    if (!S.job) return;
+    // typing must survive a redraw: remember where the cursor is
+    var act = document.activeElement, keep = null;
+    if (act && act.dataset && act.dataset.f && act.closest("tr[data-key]")){
+      keep = {key: act.closest("tr[data-key]").dataset.key, f: act.dataset.f, a: act.selectionStart, b: act.selectionEnd, v: act.value};
+    }
+    var all = buildLines(), vis = visibleLines(all);
+    S.lines = all;
+    $("gridHead").innerHTML = headHtml();
+    $("gridBody").innerHTML = vis.slice(0, S.limit).map(lineHtml).join("");
+    var more = $("moreRow");
+    if (!S.rows.length){ more.hidden = false; more.textContent = "This job has no equipment in the Database yet."; }
+    else if (!vis.length){ more.hidden = false; more.textContent = "Nothing matches the search or filter."; }
+    else if (vis.length > S.limit){
+      more.hidden = false;
+      more.innerHTML = "Showing " + S.limit + " of " + vis.length + ' lines. <button type="button" id="moreBtn">Show ' + Math.min(LINES_SHOWN, vis.length - S.limit) + ' more</button>';
+    } else more.hidden = true;
+    if (keep){
+      var input = document.querySelector('tr[data-key="' + keep.key + '"] [data-f="' + keep.f + '"]');
+      if (input){
+        if (input.tagName === "INPUT") input.value = keep.v;
+        input.focus();
+        try{ if (keep.a != null) input.setSelectionRange(keep.a, keep.b); }catch(e){}
+      }
+    }
+    // locations already used in this job, offered as you type
+    var locs = {};
+    all.forEach(function(l){ var v = String(feOf(l.key).location || "").trim(); if (v) locs[v] = true; });
+    $("locList").innerHTML = Object.keys(locs).sort().map(function(v){ return '<option value="' + esc(v) + '">'; }).join("");
+    refreshChecks();
+    refreshProgress();
+  }
+  function refreshProgress(){
+    var counts = {"": 0, in_progress: 0, done: 0, na: 0};
+    (S.lines || []).forEach(function(l){ var st = feOf(l.key).status || ""; counts[st] = (counts[st] || 0) + 1; });
+    var total = counts[""] + counts.in_progress + counts.done;
+    var pct = total ? Math.round(counts.done / total * 100) : 0;
+    $("progressBar").style.width = pct + "%";
+    $("progressText").textContent = total ? counts.done + " of " + total + " done (" + pct + "%)" + (counts.in_progress ? " · " + counts.in_progress + " in progress" : "") + (counts.na ? " · " + counts.na + " N/A" : "")
+      : (S.lines && S.lines.length ? "Every line is marked N/A" : "");
+  }
+  // Checks as you go: an address that isn't a valid IPv4 address is marked,
+  // and so is an IP address, MAC address or host name that two devices share.
+  function validIp(v){
+    var m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(v);
+    return !!m && m.slice(1).every(function(n){ return Number(n) <= 255; });
+  }
+  function tidyMac(v){
+    var hex = String(v).replace(/[^0-9a-fA-F]/g, "");
+    return hex.length === 12 ? hex.toUpperCase().match(/.{2}/g).join(":") : String(v).trim();
+  }
+  function refreshChecks(){
+    var uniques = FE_COLS.filter(function(c){ return c.unique; });
+    var seen = {};
+    (S.lines || []).forEach(function(l){
+      var fe = feOf(l.key);
+      if (fe.status === "na") return;
+      uniques.forEach(function(c){
+        var v = String(fe[c.key] || "").trim().toLowerCase();
+        if (v) (seen[c.key + "=" + v] = seen[c.key + "=" + v] || []).push(l);
+      });
+    });
+    Array.prototype.forEach.call($("gridBody").querySelectorAll("input[data-f]"), function(input){
+      var f = input.dataset.f, c = FE_COLS.filter(function(x){ return x.key === f; })[0], v = input.value.trim();
+      if (!c) return;
+      var bad = c.kind === "ip" && v && !validIp(v);
+      var warn = false, title = "";
+      if (bad) title = "This isn't a complete address - four numbers from 0 to 255, like 192.168.1.20";
+      if (c.unique && v && !bad){
+        var key = input.closest("tr").dataset.key;
+        var others = (seen[f + "=" + v.toLowerCase()] || []).filter(function(l){ return l.key !== key; });
+        if (others.length){
+          warn = true;
+          title = "Same " + c.label + " as " + others.slice(0, 3).map(lineName).join(", ") + (others.length > 3 ? " and " + (others.length - 3) + " more" : "");
+        }
+      }
+      input.classList.toggle("bad", !!bad);
+      input.classList.toggle("warn", warn);
+      input.title = title;
+    });
+  }
+
+  // ---------- saving ----------
+  // Every change is sent as "this field of this line is now X" (the database
+  // function fe_save_device merges it in), so two engineers filling in
+  // different boxes of the same device never undo each other. Changes that
+  // can't be sent - no signal in a comms room - wait on this device and go
+  // when the connection is back.
+  function pendingNote(){
+    var n = Object.keys(S.pending).length;
+    return n ? " - " + n + " line" + (n === 1 ? "" : "s") + " waiting to be saved" : "";
+  }
+  function showSaveState(){
+    if (S.saving) setStatus("busy", "Saving...");
+    else if (Object.keys(S.pending).length) setStatus("bad", navigator.onLine === false ? "Offline" + pendingNote() : "Not saved yet" + pendingNote());
+    else if (S.tableMissing) setStatus("bad", "Read only - set-up not finished");
+    else if (S.job && !S.canEdit) setStatus("ok", "Up to date");
+    else setStatus("ok", "All changes saved");
+  }
+  function setField(key, f, value){
+    var saved = (S.dev[key] && S.dev[key].data) || {};
+    var p = S.pending[key] || (S.pending[key] = {patch: {}});
+    if (!p.patch) p.patch = {};
+    if (String(saved[f] == null ? "" : saved[f]) === value) delete p.patch[f]; else p.patch[f] = value;
+    if (!Object.keys(p.patch).length && p.deleted == null && !p.create) delete S.pending[key];
+    writePending();
+    flushSoon(700);
+  }
+  // What gets saved for a box. The Serial Number box shows the Database's own
+  // serial until one is typed here; typing that same serial saves nothing extra.
+  function storedValue(key, f, value){
+    if (f !== "serialNumber") return value;
+    var cut = key.lastIndexOf("|"), rowId = key.slice(0, cut);
+    var row = S.rows.filter(function(r){ return r.id === rowId; })[0];
+    return key.slice(cut + 1) === "1" && row && value === String(row.data.serialNumber || "") ? "" : value;
+  }
+  function flushSoon(ms){
+    clearTimeout(S.saveTimer);
+    if (!Object.keys(S.pending).length){ showSaveState(); return; }
+    setStatus("busy", "Saving...");
+    S.saveTimer = setTimeout(flush, ms);
+  }
+  // Sends what is waiting for one job, a few lines at a time, and takes each
+  // thing off the waiting list as the database confirms it - unless it has
+  // been changed again since it was sent. Resolves with the error that stopped
+  // it, or null.
+  function sendPending(jobId, pend, onSaved){
+    var sent = Object.keys(pend).map(function(k){ var p = pend[k]; return {key: k, patch: Object.assign({}, p.patch || {}), deleted: p.deleted}; });
+    var failed = null, i = 0;
+    function one(item){
+      var cut = item.key.lastIndexOf("|");
+      return Promise.resolve().then(function(){
+        return S.sb.rpc("fe_save_device", {p_job: jobId, p_row: item.key.slice(0, cut), p_unit: Number(item.key.slice(cut + 1)), p_patch: item.patch,
+          p_deleted: item.deleted === true || item.deleted === false ? item.deleted : null});
+      }).then(function(r){
+        if (r.error) throw r.error;
+        var row = Array.isArray(r.data) ? r.data[0] : r.data;
+        if (row && row.row_id && onSaved) onSaved(item.key, row);
+        var p = pend[item.key];
+        if (!p) return;
+        Object.keys(item.patch).forEach(function(f){ if (p.patch && p.patch[f] === item.patch[f]) delete p.patch[f]; });
+        if (p.deleted === item.deleted) delete p.deleted;
+        delete p.create;
+        if (!Object.keys(p.patch || {}).length && p.deleted == null) delete pend[item.key];
+      });
+    }
+    function worker(){
+      if (failed || i >= sent.length) return Promise.resolve();
+      return one(sent[i++]).then(worker, function(e){ failed = e; });
+    }
+    return Promise.all([worker(), worker(), worker()]).then(function(){ return failed; });
+  }
+  var MISSING_TABLE = "The database isn't set up for this tracker yet, so nothing can be saved. Run add-field-engineering-tracker.sql in the Supabase SQL editor (step 2 in the read-me), then reload.";
+  // resolves when this round of saving is over, whether or not everything went
+  function flush(){
+    if (S.saving) return S.saving;
+    if (!S.job || !S.sb || !S.canEdit || S.tableMissing || !Object.keys(S.pending).length){ showSaveState(); return Promise.resolve(); }
+    var jobId = S.job.id;
+    clearTimeout(S.retryTimer); clearTimeout(S.saveTimer);
+    setStatus("busy", "Saving...");
+    S.saving = sendPending(jobId, S.pending, function(key, row){
+      if (!S.job || S.job.id !== jobId) return;
+      S.dev[key] = row;
+      S.saveSeq++;
+    }).then(function(failed){
+      S.saving = null;
+      if (!S.job || S.job.id !== jobId) return;
+      writePending(); writeCache();
+      if (failed){
+        if (isMissingTable(failed)){ S.tableMissing = true; notice(MISSING_TABLE); render(); showSaveState(); return; }
+        if (isNetworkProblem(failed)) setStatus("bad", "Offline" + pendingNote());
+        else { setStatus("bad", "Couldn't save" + pendingNote()); snack("Couldn't save: " + (failed.message || failed)); }
+        S.retryTimer = setTimeout(flush, 15000);
+        return;
+      }
+      if (Object.keys(S.pending).length) flushSoon(300); else showSaveState();
+    });
+    return S.saving;
+  }
+  // Changes typed with no connection wait on this device under their job. If
+  // the job they belong to isn't the one open now, they are sent from here.
+  function sendStoredPending(){
+    if (!S.sb || !S.canEdit || navigator.onLine === false) return;
+    var keys = [];
+    try{ for (var i = 0; i < localStorage.length; i++){ var k = localStorage.key(i); if (k && k.indexOf(K.pending) === 0) keys.push(k); } }catch(e){}
+    keys.forEach(function(k){
+      var jobId = k.slice(K.pending.length);
+      if (S.job && S.job.id === jobId) return;
+      var pend = lsJson(k);
+      if (!pend || !Object.keys(pend).length){ lsDel(k); return; }
+      sendPending(jobId, pend).then(function(){
+        if (S.job && S.job.id === jobId) return;   // opened meanwhile: that job's own saving has it now
+        if (Object.keys(pend).length) lsSet(k, JSON.stringify(pend)); else lsDel(k);
+      });
+    });
+  }
+
+  // ---------- lines for the 2nd, 3rd... of an equipment line ----------
+  function nextUnit(rowId){
+    var max = 1;
+    Object.keys(S.dev).concat(Object.keys(S.pending)).forEach(function(k){
+      var i = k.lastIndexOf("|");
+      if (k.slice(0, i) === rowId) max = Math.max(max, Number(k.slice(i + 1)) || 1);
+    });
+    return max + 1;
+  }
+  function addUnits(rowId, howMany){
+    for (var n = 0; n < howMany; n++){
+      // a removed line's number is used again before a new one is made
+      var reuse = null, u;
+      for (u = 2; u < nextUnit(rowId); u++){ if (isDeleted(rowId + "|" + u)){ reuse = u; break; } }
+      var key = rowId + "|" + (reuse || nextUnit(rowId));
+      var p = S.pending[key] || (S.pending[key] = {patch: {}});
+      p.create = true; p.deleted = false;
+    }
+    writePending(); render(); flushSoon(0);
+  }
+  function removeUnit(key){
+    var fe = feOf(key);
+    var filled = FE_COLS.some(function(c){ return String(fe[c.key] || "").trim(); });
+    if (filled && !confirm("Remove this line? What has been filled in on it will go with it.")) return;
+    if (!S.dev[key]){ delete S.pending[key]; }       // never reached the database: nothing to undo there
+    else {
+      var clear = {};
+      Object.keys((S.dev[key].data) || {}).forEach(function(f){ clear[f] = ""; });
+      S.pending[key] = {patch: clear, deleted: true};
+    }
+    writePending(); render(); flushSoon(0);
+  }
+
+  // ---------- spreadsheet ----------
+  function exportExcel(){
+    if (typeof XLSX === "undefined"){ snack("The spreadsheet library didn't load - check the connection and try again."); return; }
+    var withSecrets = $("exportSecrets").checked;
+    var cols = FE_COLS.filter(function(c){ return withSecrets || (c.key !== "login" && c.key !== "password"); });
+    var head = ["BarCode", "Manufacturer", "Model", "Description", "QTY"].concat(cols.map(function(c){ return c.label; }), ["Status"]);
+    var lines = visibleLines(buildLines());
+    var aoa = [head].concat(lines.map(function(l){
+      var d = l.row.data, fe = feOf(l.key);
+      return [d.barcode || "", d.manufacturer || "", d.model || "", d.deviceType || "", valueOf(l, fe, "qty")]
+        .concat(cols.map(function(c){ return valueOf(l, fe, c.key); }), [(STATUSES.filter(function(s){ return s[0] === (fe.status || ""); })[0] || ["", ""])[1]]);
+    }));
+    var ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!cols"] = head.map(function(h, i){
+      var max = h.length;
+      aoa.forEach(function(r){ var n = String(r[i] == null ? "" : r[i]).length; if (n > max) max = n; });
+      return {wch: Math.min(50, Math.max(8, max + 2))};
+    });
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Field Engineering");
+    var out = XLSX.write(wb, {bookType: "xlsx", type: "array"});
+    var now = new Date(), p2 = function(n){ return String(n).padStart(2, "0"); };
+    var stamp = p2(now.getHours()) + p2(now.getMinutes()) + "-" + p2(now.getMonth() + 1) + p2(now.getDate()) + String(now.getFullYear()).slice(2);
+    var name = [jobLabel(S.job), S.job.meta.projectNumber || "", "Field Engineering", stamp].filter(Boolean).join(" - ").replace(/[\\/:*?"<>|]+/g, " ") + ".xlsx";
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([out], {type: "application/octet-stream"}));
+    a.download = name;
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    snack("Exported " + lines.length + " line" + (lines.length === 1 ? "" : "s") + (withSecrets ? ", with logins and passwords." : ", without logins and passwords."));
+  }
+
+  // ---------- what the page reacts to ----------
+  $("jobList").addEventListener("click", function(ev){
+    var b = ev.target.closest("[data-job]");
+    if (!b) return;
+    var job = S.jobs.filter(function(j){ return j.id === b.dataset.job; })[0];
+    if (job) openJob(job);
   });
-  // left / right arrow keys step through the tabs, as in a browser
-  $("tabs").addEventListener("keydown", function(ev){
-    if (ev.key !== "ArrowLeft" && ev.key !== "ArrowRight") return;
-    var shown = APPS.filter(function(a){ return !a.tab.hidden; });
-    var i = shown.indexOf(byId(active));
-    if (i === -1 || shown.length < 2) return;
-    var next = shown[(i + (ev.key === "ArrowRight" ? 1 : shown.length - 1)) % shown.length];
+  $("jobSearch").addEventListener("input", renderJobs);
+  $("jobArchived").addEventListener("change", renderJobs);
+  $("jobsBtn").addEventListener("click", function(){
+    Promise.resolve(flush()).then(function(){
+      var left = Object.keys(S.pending).length;
+      if (left) snack(left + " line" + (left === 1 ? " is" : "s are") + " still waiting to be saved. They are kept on this device and sent when there is a connection.");
+      showJobs();
+    });
+  });
+  $("signOutBtn").addEventListener("click", signOut);
+  $("search").addEventListener("input", function(){ S.search = $("search").value.trim(); S.limit = LINES_SHOWN; render(); });
+  $("chips").addEventListener("click", function(ev){
+    var b = ev.target.closest("button[data-st]");
+    if (!b) return;
+    S.filter = b.dataset.st; S.limit = LINES_SHOWN;
+    Array.prototype.forEach.call($("chips").querySelectorAll("button"), function(x){ x.classList.toggle("active", x === b); });
+    render();
+  });
+  $("showSecrets").addEventListener("change", function(){
+    S.showSecrets = $("showSecrets").checked;
+    Array.prototype.forEach.call($("gridBody").querySelectorAll("input.secret"), function(i){ i.classList.toggle("masked", !S.showSecrets); });
+  });
+  $("exportBtn").addEventListener("click", exportExcel);
+  $("gridHead").addEventListener("click", function(ev){
+    var th = ev.target.closest("th[data-sort]");
+    if (!th) return;
+    var key = th.dataset.sort;
+    // first click A to Z, second Z to A, third back to the Database's own order
+    S.sort = !S.sort || S.sort.key !== key ? {key: key, dir: 1} : S.sort.dir === 1 ? {key: key, dir: -1} : null;
+    render();
+  });
+  // a tablet has no pointer to hover with: stepping into a flagged box says what is wrong with it
+  $("gridBody").addEventListener("focusin", function(ev){
+    var t = ev.target;
+    if (t && t.matches && t.matches("input.bad, input.warn") && t.title) snack(t.title);
+  });
+  $("moreRow").addEventListener("click", function(ev){
+    if (ev.target.id !== "moreBtn") return;
+    S.limit += LINES_SHOWN; render();
+  });
+  var body = $("gridBody");
+  body.addEventListener("input", function(ev){
+    var t = ev.target;
+    if (!t.dataset || !t.dataset.f || t.tagName !== "INPUT") return;
+    if (!S.canEdit) return;
+    t.classList.remove("from-db");
+    setField(t.closest("tr").dataset.key, t.dataset.f, storedValue(t.closest("tr").dataset.key, t.dataset.f, t.value));
+  });
+  body.addEventListener("change", function(ev){
+    var t = ev.target;
+    if (!t.dataset || !t.dataset.f || !S.canEdit) return;
+    var tr = t.closest("tr"), key = tr.dataset.key, f = t.dataset.f;
+    if (t.tagName === "SELECT"){
+      setField(key, "status", t.value);
+      t.className = "st-" + (t.value || "none");
+      tr.classList.toggle("is-na", t.value === "na");
+      // a line that no longer matches the filter stays put until the filter is pressed again
+      refreshProgress(); refreshChecks();
+      return;
+    }
+    // tidy what was typed once the box is left
+    var c = FE_COLS.filter(function(x){ return x.key === f; })[0];
+    var v = c && c.kind === "mac" ? tidyMac(t.value) : t.value.trim();
+    if (v !== t.value){ t.value = v; setField(key, f, storedValue(key, f, v)); }
+    refreshChecks();
+  });
+  // Enter and the up/down arrows move to the same box on the next line, like a spreadsheet
+  body.addEventListener("keydown", function(ev){
+    var t = ev.target;
+    if (!t.dataset || !t.dataset.f || t.tagName !== "INPUT") return;
+    if (ev.key !== "Enter" && ev.key !== "ArrowDown" && ev.key !== "ArrowUp") return;
+    if (t.getAttribute("list") && ev.key !== "Enter") return;   // the arrows choose from the suggestions there
+    var tr = t.closest("tr"), to = ev.key === "ArrowUp" ? tr.previousElementSibling : tr.nextElementSibling;
+    var next = to && to.querySelector('[data-f="' + t.dataset.f + '"]');
+    if (!next) return;
     ev.preventDefault();
-    activate(next.id);
-    next.tab.focus();
+    next.focus();
+    try{ next.select(); }catch(e){}
   });
-  // Reloads just the open tab (the app asks first if it has anything unsaved).
-  $("reloadBtn").addEventListener("click", function(){
-    var app = byId(active);
-    if (!app) return;
-    if (!app.frame){ open(app); return; }
-    try{ app.frame.contentWindow.location.reload(); }catch(e){ open(app); }
+  body.addEventListener("click", function(ev){
+    var b = ev.target.closest("button[data-act]");
+    if (!b || !S.canEdit) return;
+    var key = b.closest("tr").dataset.key, rowId = key.slice(0, key.lastIndexOf("|"));
+    var row = S.rows.filter(function(r){ return r.id === rowId; })[0];
+    if (b.dataset.act === "remove"){ removeUnit(key); return; }
+    if (!row) return;
+    var have = buildLines().filter(function(l){ return l.row.id === rowId; }).length;
+    addUnits(rowId, b.dataset.act === "split" ? Math.max(0, qtyOf(row) - have) : 1);
+  });
+  window.addEventListener("online", function(){ if (S.job){ flushSoon(0); loadJob(false); } });
+  window.addEventListener("offline", showSaveState);
+  document.addEventListener("visibilitychange", function(){
+    if (document.hidden){ if (Object.keys(S.pending).length) flush(); }
+    else if (S.job && !Object.keys(S.pending).length) loadJob(false);
   });
 
-  // the sign-in changed in one of the apps (or in another window): look again
-  window.addEventListener("storage", function(ev){ if (!ev.key || /^sb-.+-auth-token$/.test(ev.key)) observe(); });
-  setInterval(observe, 4000);
-  window.addEventListener("hashchange", function(){
-    var want = location.hash.replace(/^#/, "");
-    if (byId(want) && want !== active) activate(want);
-  });
+  if (RAW_CFG && RAW_CFG.debug) window.__fet = {S: S, render: render, flush: flush, buildLines: buildLines, feOf: feOf, loadJob: loadJob};
+  boot();
 
-  observe();
-  var want = location.hash.replace(/^#/, "");
-  activate(byId(want) ? want : (lsGet(K.tab) || APPS[0].id));
-
+  // installable app: opens offline once it has been opened over https
   if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)){
     window.addEventListener("load", function(){ navigator.serviceWorker.register("sw.js").catch(function(){}); });
   }
