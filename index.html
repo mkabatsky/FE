@@ -2,7 +2,7 @@
 <html lang="en"><head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#1a3a6b">
+<meta name="theme-color" content="#0f5c53">
 <link rel="manifest" href="manifest.webmanifest">
 <script src="config.js"></script>
 <link rel="icon" type="image/png" href="icon-192.png">
@@ -14,16 +14,18 @@
 <style>
   :root{
     color-scheme: light dark;
-    --bg:#f2f4f7; --surface:#ffffff; --surface-alt:#e9edf2; --border:#d6dce3;
-    --ink:#1a2530; --ink-muted:#64707c; --navy:#1a3a6b;
+    /* green-tinted on purpose: the Database is grey-blue and the Install Tracker cream,
+       so a glance at the page colour says which of the three this is */
+    --bg:#e2efea; --surface:#ffffff; --surface-alt:#d3e6df; --border:#bdd5cc;
+    --ink:#1a2530; --ink-muted:#55636a; --navy:#0f5c53;
     --accent:#b8720f; --accent-ink:#ffffff; --danger:#af2c1e; --success:#3a7d44; --focus:#b8720f;
     --warn-bg:#fff4e0; --warn-ink:#8a5a00; --bad-bg:#fbe9e7;
     --shadow:0 1px 2px rgba(20,26,33,.06),0 4px 14px rgba(20,26,33,.06);
   }
   @media (prefers-color-scheme: dark){
     :root{
-      --bg:#12161b; --surface:#1b2129; --surface-alt:#222a33; --border:#333e4a;
-      --ink:#e7eaee; --ink-muted:#96a2ad; --navy:#3d68b0;
+      --bg:#0d1a17; --surface:#152521; --surface-alt:#1c312c; --border:#2c4840;
+      --ink:#e7eaee; --ink-muted:#96a8a2; --navy:#2a8f7e;
       --accent:#e0a032; --accent-ink:#171207; --danger:#e05d4c; --success:#5cba69; --focus:#e0a032;
       --warn-bg:#3a2e12; --warn-ink:#f0c060; --bad-bg:#3b1a16;
       --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 20px rgba(0,0,0,.35);
@@ -175,7 +177,7 @@
     <div class="brand">
       <div class="badge">FE</div>
       <div>
-        <h1>Field Engineering Tracker<span class="build" id="buildTag" title="Build 1 - October 8, 2026">Build 1</span></h1>
+        <h1>Field Engineering Tracker<span class="build" id="buildTag" title="Build 2 - October 8, 2026">Build 2</span></h1>
         <p class="sub" id="subhead">Equipment from the Database, with the network and set-up details for each device.</p>
       </div>
     </div>
@@ -339,18 +341,32 @@
     if (!isError && message) $("loginSub").textContent = message;
     $("loginBtn").disabled = !CFG;
   }
+  // Signed in somewhere else on the site while this page was sitting on its
+  // sign-in form: carry on as that person, no second sign-in needed. Does
+  // nothing when this page is already signed in, or is in the middle of its
+  // own sign-in.
+  function pickUpSignIn(){
+    if (!S.sb || S.user || S.signingIn || $("login").hidden) return;
+    S.sb.auth.getSession().then(function(r){
+      var session = r && r.data && r.data.session;
+      if (session && session.user && !S.user && !S.signingIn) afterSignIn(session.user);
+    }, function(){});
+  }
   function boot(){
     $("loginForm").addEventListener("submit", function(ev){
       ev.preventDefault();
       if (!S.sb) return;
       $("loginBtn").disabled = true; $("loginErr").textContent = "";
+      S.signingIn = true;   // this form is doing the signing in: pickUpSignIn stays out of it
       S.sb.auth.signInWithPassword({email: $("loginEmail").value.trim(), password: $("loginPassword").value}).then(function(r){
         $("loginBtn").disabled = false;
+        S.signingIn = false;
         if (r.error){ $("loginErr").textContent = /invalid login/i.test(r.error.message) ? "That email and password don't match." : r.error.message; return; }
         $("loginPassword").value = "";
         return afterSignIn(r.data.user);
       }).catch(function(e){
         $("loginBtn").disabled = false;
+        S.signingIn = false;
         $("loginErr").textContent = isNetworkProblem(e) ? "You're offline - signing in needs an internet connection." : "Couldn't sign in: " + (e && e.message ? e.message : e);
       });
     });
@@ -367,6 +383,13 @@
       });
       S.sb.auth.onAuthStateChange(function(evt){
         if (evt === "SIGNED_OUT" && S.user){ leaveJob(); S.user = null; showLogin("You were signed out. Sign in again."); }
+        if (evt === "SIGNED_IN") pickUpSignIn();
+      });
+      // The Database and the Install Tracker share this sign-in. Its arrival in
+      // the browser's storage is the other way this page hears that someone has
+      // just signed in on one of those, or in another tab.
+      window.addEventListener("storage", function(ev){
+        if (ev.newValue && ev.key && /^sb-.+-auth-token$/.test(ev.key)) pickUpSignIn();
       });
       return S.sb.auth.getSession();
     }).then(function(r){
@@ -381,9 +404,13 @@
   }
   // Who is this, and what may they do here? The roles are the Equipment
   // Database's own (its eq_profiles table), since the equipment comes from it:
-  //   full access (Admin, Warehouse, Staff) and PC  - fill everything in
-  //   Viewer                                        - look only
-  //   Driver, Dashboard view                        - no access
+  //   full access (Admin, Warehouse, Staff)   - fill everything in
+  //   PC, PC-FE, FE                           - fill in the job(s) they can open
+  //   Viewer, FE Viewer                       - look only
+  //   Driver, Dashboard view                  - no access
+  // PC-FE / FE / FE Viewer are marked by eq_profiles.fe_kind on top of the role: a PC-FE
+  // is a PC ("tech") underneath; an FE and an FE Viewer are Viewers underneath, and FE is
+  // the one Viewer that may fill in (the database rule says the same).
   function afterSignIn(user, offline){
     S.user = {id: user.id, email: user.email || ""};
     lsSet(K.user, JSON.stringify(S.user));
@@ -393,14 +420,16 @@
     return profileReq.then(function(pr){
       if (pr.error) throw pr.error;
       var p = pr.data || {};
-      if (!pr.cached) lsSet(K.role, JSON.stringify({role: p.role || "", job_id: p.job_id || null, staff_kind: p.staff_kind || ""}));
+      if (!pr.cached) lsSet(K.role, JSON.stringify({role: p.role || "", job_id: p.job_id || null, staff_kind: p.staff_kind || "", fe_kind: p.fe_kind || ""}));
       return p;
     }, function(){ return lsJson(K.role) || {}; }).then(function(p){
       S.role = p.role || "staff";
       S.lockedJobId = (S.role === "viewer" || S.role === "tech") ? (p.job_id || null) : null;
-      S.canEdit = S.role === "staff" || S.role === "tech";
+      S.feKind = p.fe_kind || "";
+      S.canEdit = S.role === "staff" || S.role === "tech" || (S.role === "viewer" && S.feKind === "fe");
       $("login").hidden = true; $("app").hidden = false;
-      var tag = S.role === "viewer" ? "Viewer - read only" : S.role === "tech" ? "PC" : p.staff_kind === "admin" ? "Admin" : p.staff_kind === "warehouse" ? "Warehouse" : "";
+      var tag = S.role === "viewer" ? (S.feKind === "fe" ? "FE" : S.feKind === "fe_viewer" ? "FE Viewer - read only" : "Viewer - read only")
+        : S.role === "tech" ? (S.feKind === "pc_fe" ? "PC-FE" : "PC") : p.staff_kind === "admin" ? "Admin" : p.staff_kind === "warehouse" ? "Warehouse" : "";
       $("roleTag").textContent = tag; $("roleTag").hidden = !tag;
       $("jobsBtn").hidden = !!S.lockedJobId;
       if (S.role === "driver" || S.role === "dashboard"){
