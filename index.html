@@ -152,6 +152,38 @@
     .grid td.c-model{grid-column:auto;}
     .brand h1{font-size:16px;}
   }
+  /* ---- where a job comes from: the Database, the Install Tracker, or made here ---- */
+  .src-tag{align-self:flex-start;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 8px;border-radius:99px;border:1px solid var(--border);color:var(--ink-muted);background:var(--surface-alt);white-space:nowrap;}
+  .src-tag.src-it{background:#f4f1e9;color:#5c4a1e;border-color:#e0d6bd;}
+  .src-tag.src-fe{background:var(--navy);color:#fff;border-color:var(--navy);}
+  @media (prefers-color-scheme: dark){ .src-tag.src-it{background:#3a321c;color:#ead9a8;border-color:#5a4d2a;} }
+  .job-card .jtags{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+  .jobs-bar .chips{flex:0 1 auto;}
+  .jobs-bar .spacer{flex:1 1 0;}
+  .job-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .job-actions button{padding:6px 11px;font-size:12.5px;}
+  button.danger{color:var(--danger);border-color:var(--danger);}
+  /* a typed-in line's own equipment boxes; the QTY box shares its cell with the remove button */
+  .qty input{flex:1 1 auto;width:auto;min-width:0;}
+  .grid td.c-qty .qty{padding:0 6px 0 0;}
+  .grid td.own-qty{padding:0;}
+  /* ---- small windows (new job, paste from Excel) ---- */
+  .modal{position:fixed;inset:0;z-index:55;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(10,20,18,.55);}
+  .modal-card{width:100%;max-width:560px;max-height:calc(100vh - 32px);overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:20px;display:flex;flex-direction:column;gap:12px;}
+  .modal-card.wide{max-width:760px;}
+  .modal-card h2{font-size:17px;}
+  .modal-card p{font-size:13px;color:var(--ink-muted);}
+  .modal-card label{display:flex;flex-direction:column;gap:5px;font-size:12.5px;font-weight:600;color:var(--ink-muted);}
+  .modal-card input[type=text], .modal-card textarea{font:inherit;font-size:16px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--ink);}
+  .modal-card textarea{min-height:170px;resize:vertical;font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-size:13px;white-space:pre;overflow:auto;}
+  .modal-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;align-items:center;}
+  .modal-actions .spacer{flex:1 1 0;}
+  .modal-msg{font-size:13px;color:var(--ink-muted);min-height:18px;}
+  .modal-msg.bad{color:var(--danger);font-weight:600;}
+  .modal-msg.good{color:var(--success);font-weight:600;}
+  .paste-peek{font-size:12.5px;border:1px solid var(--border);border-radius:8px;padding:8px 10px;background:var(--bg);overflow-wrap:anywhere;}
+  .paste-peek b{color:var(--ink-muted);font-weight:600;}
+  .paste-peek div + div{margin-top:5px;padding-top:5px;border-top:1px dashed var(--border);}
   #snackbar{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:13px;max-width:calc(100vw - 24px);box-shadow:var(--shadow);z-index:60;opacity:0;pointer-events:none;transition:opacity .2s;}
   #snackbar.show{opacity:1;}
 </style>
@@ -177,7 +209,7 @@
     <div class="brand">
       <div class="badge">FE</div>
       <div>
-        <h1>Field Engineering Tracker<span class="build" id="buildTag" title="Build 2 - October 8, 2026">Build 2</span></h1>
+        <h1>Field Engineering Tracker<span class="build" id="buildTag" title="Build 3 - October 9, 2026">Build 3</span></h1>
         <p class="sub" id="subhead">Equipment from the Database, with the network and set-up details for each device.</p>
       </div>
     </div>
@@ -195,7 +227,15 @@
   <section id="jobsView" hidden>
     <div class="jobs-bar">
       <input type="search" id="jobSearch" placeholder="Find a job by name, job number or address..." autocomplete="off">
+      <div class="chips" id="srcChips" role="group" aria-label="Where the job is from" hidden>
+        <button type="button" class="active" data-src="all">All</button>
+        <button type="button" data-src="db">Database</button>
+        <button type="button" data-src="it">Install Tracker</button>
+        <button type="button" data-src="fe">Made here</button>
+      </div>
       <label><input type="checkbox" id="jobArchived"> Show archived jobs</label>
+      <span class="spacer"></span>
+      <button type="button" class="primary" id="newJobBtn" hidden>New job</button>
     </div>
     <div class="job-list" id="jobList"></div>
     <div class="empty" id="jobsMsg"></div>
@@ -206,6 +246,12 @@
       <div class="jt">
         <h2 id="jobTitle"></h2>
         <p class="sub" id="jobDetail"></p>
+      </div>
+      <div class="job-actions" id="jobActions">
+        <span class="src-tag" id="jobSrcTag"></span>
+        <button type="button" id="jobEditBtn" hidden>Job details</button>
+        <button type="button" id="jobArchiveBtn" hidden>Archive job</button>
+        <button type="button" class="danger" id="jobDeleteBtn" hidden>Delete job</button>
       </div>
       <div class="progress">
         <div class="bar"><i id="progressBar"></i></div>
@@ -221,6 +267,9 @@
         <button type="button" data-st="done">Done</button>
         <button type="button" data-st="na">N/A</button>
       </div>
+      <button type="button" class="primary" id="addLineBtn" hidden>Add line</button>
+      <button type="button" id="pasteBtn" hidden title="Start the list from rows copied in Excel, or from a spreadsheet file">Paste from Excel</button>
+      <button type="button" id="undoPasteBtn" hidden></button>
       <span class="spacer"></span>
       <label title="Show what is typed in the Password column"><input type="checkbox" id="showSecrets"> Show passwords</label>
       <label title="Leave unticked to keep the Login and Password columns out of the spreadsheet"><input type="checkbox" id="exportSecrets"> Include logins in export</label>
@@ -232,6 +281,39 @@
     </div>
     <datalist id="locList"></datalist>
   </section>
+</div>
+
+<!-- a job made in the tracker itself: its name, number and address -->
+<div class="modal" id="jobModal" hidden>
+  <form class="modal-card" id="jobForm" autocomplete="off">
+    <h2 id="jobModalTitle">New job</h2>
+    <p id="jobModalSub">A job of the tracker's own - nothing to do with the Equipment Database or the Install Tracker. Its device lines are typed in here, or pasted from Excel.</p>
+    <label>Job name<input type="text" id="jobFormName" maxlength="160" required></label>
+    <label>Job number (optional)<input type="text" id="jobFormNumber" maxlength="60"></label>
+    <label>Address (optional)<input type="text" id="jobFormAddress" maxlength="240"></label>
+    <div class="modal-msg" id="jobFormMsg" aria-live="polite"></div>
+    <div class="modal-actions">
+      <button type="button" id="jobFormCancel">Cancel</button>
+      <button type="submit" class="primary" id="jobFormSave">Create job</button>
+    </div>
+  </form>
+</div>
+
+<!-- lines from a spreadsheet -->
+<div class="modal" id="pasteModal" hidden>
+  <div class="modal-card wide">
+    <h2>Paste from Excel</h2>
+    <p>In Excel, select the rows (with the heading row if there is one), copy, then paste into the box. With headings, the columns can be in any order and extra ones are ignored. Without headings, they are read in this order: BarCode, Manufacturer, Model, Description, QTY, Serial Number, MAC Address, Location, Device ID, Firmware Version, Host Name, IP Address, Subnet Mask, Gateway, DNS 1, DNS 2, Login, Password, Notes.</p>
+    <textarea id="pasteBox" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="Paste here..."></textarea>
+    <div class="modal-msg" id="pasteMsg" aria-live="polite"></div>
+    <div class="paste-peek" id="pastePeek" hidden></div>
+    <div class="modal-actions">
+      <label style="flex-direction:row;align-items:center;gap:8px;">or a file: <input type="file" id="pasteFile" accept=".xlsx,.xls,.csv,.tsv,.txt"></label>
+      <span class="spacer"></span>
+      <button type="button" id="pasteCancel">Cancel</button>
+      <button type="button" class="primary" id="pasteAdd" disabled>Add lines</button>
+    </div>
+  </div>
 </div>
 
 <div id="snackbar" role="status" aria-live="polite"></div>
@@ -279,9 +361,21 @@
   var LINES_SHOWN = 150;   // lines drawn at once; search and filters still cover them all
   var SPLIT_MAX = 24;      // "Split" makes every line in one go up to this many
 
+  // Where a job comes from. "db" = a job in the Equipment Database: its
+  // equipment lines come from there and can't be changed here. "it" = a
+  // project in the Install Tracker, "fe" = a job made in this tracker: for
+  // those two the lines are the tracker's own - typed in, or pasted from Excel
+  // - so their BarCode, Manufacturer, Model, Description and QTY are boxes too.
+  var SOURCES = {db: "Database", it: "Install Tracker", fe: "Made here"};
+  function ownLines(job){ return !!job && job.source !== "db"; }
+  var OWN_FIELDS = ["barcode", "manufacturer", "model", "deviceType", "totalQty"];
+  var SW_CACHE = "field-eng-v3";   // the same name as CACHE in sw.js
+
   var S = {
     sb: null, user: null, role: "staff", lockedJobId: null, canEdit: false,
     jobs: [], job: null,
+    sourcesReady: null,  // has add-fe-job-sources.sql been run? null = not known yet
+    srcFilter: "all",    // which kind of job the list is showing
     rows: [],            // the job's equipment lines from the Database: {id, pos, data}
     dev: {},             // "rowId|unit" -> the saved field-engineering record
     pending: {},         // "rowId|unit" -> {patch: {field: value}, deleted: true|false} not yet saved
@@ -315,6 +409,335 @@
   }
   function notice(text){ $("notice").textContent = text || ""; $("notice").hidden = !text; }
 
+  // ---------- a fresh sign-in every day ----------
+  // Everyone except a Dashboard login is signed out once the date has changed
+  // since they signed in, and the page then reloads - so every screen starts
+  // the day on the current build. The Equipment Database, the Install Tracker,
+  // the Field Engineering Tracker and the Apps page all carry this same block,
+  // because one sign-in covers them all: whichever page notices first does the
+  // signing out, and the others see it and reload.
+  //   - It waits for a quiet moment: nobody has touched any of the pages for a
+  //     few minutes, no window is open with something half filled in, the
+  //     device is online, and this page has nothing unsaved. The other open
+  //     pages are told first and given a moment to send their own work.
+  //     A tablet that was asleep at midnight is signed out when it wakes.
+  //   - A Dashboard login stays signed in. Its screen looks for a newer build
+  //     every few minutes instead, and reloads itself when there is one.
+  // app = {name, swCache, sb(), signedIn(), flush() -> promise of true when
+  //        nothing is left unsaved, beforeReload(), and optionally:
+  //        unsent() -> true while something hasn't been saved,
+  //        busy() -> true while a window is open that someone may be filling in,
+  //        beforeSignOut() -> called just before the sign-in is taken away}
+  function makeDayRule(app){
+    var DAY = "mkapps.signInDay", ACTIVE = "mkapps.lastActive", OUT = "mkapps.dayOut", SEEN = "mkapps.buildSeen." + app.name;
+    var ENDING = "mkapps.dayEnding", HOLD = "mkapps.dayHold.";
+    var QUIET_MS = 3 * 60000, TICK_MS = 30000, BUILD_MS = 10 * 60000, BUILD_AGAIN_MS = 45 * 60000, MAX_TRIES = 5;
+    var WAKE_MS = 2 * 60000;        // for this long after the new day is first seen, "nobody was working then" still decides it
+    var BUSY_MS = 30 * 60000;       // an open window holds the sign-out back only while it was touched this recently
+    var TOLD_MS = 2500, HOLD_MS = 20000;   // the other pages get this long to answer, and at most this long to send their work
+    var ending = false;    // this page is in the middle of ending the day (sending its work, or signing out)
+    var leaving = false;   // ...and the sign-in is going or gone: nothing more to do here but reload
+    var tries = 0, lastTry = 0, exempt = null, lastTouch = 0, lastBuild = Date.now(), verifying = false;
+    var noticedAt = 0, wasQuiet = false;
+    var me = Math.random().toString(36).slice(2, 10);
+    function get(k){ try{ return window.localStorage.getItem(k); }catch(e){ return null; } }
+    function set(k, v){ try{ window.localStorage.setItem(k, v); }catch(e){} }
+    function del(k){ try{ window.localStorage.removeItem(k); }catch(e){} }
+    function today(){
+      var d = new Date(), p = function(n){ return (n < 10 ? "0" : "") + n; };
+      return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+    }
+    // {d: the day this sign-in was made, s: which sign-in, x: 1 for a Dashboard login}
+    function stamp(){
+      try{ var o = JSON.parse(get(DAY) || "null"); return o && typeof o === "object" && o.d ? o : null; }catch(e){ return null; }
+    }
+    // Which sign-in this is: the session's own id, which stays the same for as
+    // long as the sign-in is kept alive and is new after every fresh sign-in.
+    function keyOf(session){
+      var id = "";
+      try{
+        var part = String(session.access_token || "").split(".")[1] || "";
+        id = JSON.parse(atob(part.replace(/-/g, "+").replace(/_/g, "/"))).session_id || "";
+      }catch(e){}
+      return String(id || ("u:" + ((session.user && session.user.id) || "")));
+    }
+    function lastActive(){ return Number(get(ACTIVE)) || 0; }
+    function quiet(){
+      return navigator.onLine !== false && Date.now() - lastActive() >= QUIET_MS;
+    }
+    // A page is about to carry on with this sign-in (fresh = the password was
+    // just typed). False = it is from an earlier day: don't carry on, call
+    // endAtStart() and show the sign-in form.
+    function accept(session, fresh){
+      var st = stamp(), key = keyOf(session);
+      ending = false; leaving = false; tries = 0; exempt = null; noticedAt = 0;
+      if (fresh || !st || st.s !== key){
+        set(DAY, JSON.stringify({d: today(), s: key}));
+        if (fresh) del(OUT);
+        return true;
+      }
+      return st.d === today() || !!st.x || !quiet();
+    }
+    // Ends the sign-in on this device. Signing out needs the server to answer;
+    // if it doesn't, what the browser keeps of the sign-in is removed anyway.
+    function signOutHere(){
+      return new Promise(function(resolve){
+        var done = false;
+        var finish = function(){
+          if (done) return;
+          done = true;
+          try{
+            var keys = [];
+            for (var i = 0; i < window.localStorage.length; i++){
+              var k = window.localStorage.key(i);
+              if (k && /^sb-.+-auth-token(-code-verifier)?$/.test(k)) keys.push(k);
+            }
+            keys.forEach(del);
+          }catch(e){}
+          resolve();
+        };
+        setTimeout(finish, 8000);
+        try{
+          var sb = app.sb();
+          // "local": this browser only - the same login on another device ends its own day
+          Promise.resolve(sb ? sb.auth.signOut({scope: "local"}) : null).then(finish, finish);
+        }catch(e){ finish(); }
+      });
+    }
+    function reload(){
+      try{ app.beforeReload(); }catch(e){}
+      try{ window.location.reload(); }catch(e){}
+    }
+    // the sign-in is gone (or going): keep what is on this device and start again clean
+    function leave(){
+      leaving = true; ending = true;
+      reload();
+    }
+    function endAtStart(){
+      ending = true; leaving = true;
+      set(OUT, today());
+      // (the stamp stays until the sign-in is really gone, so another page that
+      // is starting up at the same moment still sees it as yesterday's)
+      return signOutHere().then(function(){ del(DAY); ending = false; leaving = false; });
+    }
+    // send what this page hasn't saved yet - and don't wait on it for ever
+    function flushOwn(){
+      return new Promise(function(resolve){
+        var timer = setTimeout(function(){ resolve(false); }, 20000);
+        Promise.resolve().then(function(){ return app.flush(); }).then(function(clean){ clearTimeout(timer); resolve(!!clean); }, function(){ clearTimeout(timer); resolve(false); });
+      });
+    }
+    // Is another page still sending its work? (marks older than the limit are leftovers)
+    function othersHolding(){
+      var now = Date.now(), any = false;
+      try{
+        for (var i = window.localStorage.length - 1; i >= 0; i--){
+          var k = window.localStorage.key(i);
+          if (!k || k.indexOf(HOLD) !== 0 || k === HOLD + me) continue;
+          var age = now - (Number(get(k)) || 0);
+          if (age < HOLD_MS) any = true; else if (age > 3600000) del(k);
+        }
+      }catch(e){}
+      return any;
+    }
+    // Tell the other pages the day is about to end, and give any of them that
+    // still has work to send a moment to send it while the sign-in is there.
+    function tellOthers(){
+      set(ENDING, me + ":" + Date.now());
+      return new Promise(function(resolve){
+        var began = Date.now();
+        (function look(){
+          var waited = Date.now() - began;
+          if (leaving || (waited >= TOLD_MS && (waited >= HOLD_MS || !othersHolding()))){ resolve(); return; }
+          setTimeout(look, 500);
+        })();
+      });
+    }
+    // ...and the other side of that: another page is about to end the day.
+    function helpOut(){
+      if (ending || leaving || !app.signedIn()) return;
+      set(HOLD + me, String(Date.now()));
+      var done = function(){ del(HOLD + me); };
+      try{ Promise.resolve(app.flush()).then(done, done); }catch(e){ done(); }
+    }
+    // Can the site really be reached? (Wi-Fi with no internet behind it says
+    // "online" too. Signing out then would leave the person on a sign-in
+    // form they can't use, and a reload couldn't fetch a newer build anyway.)
+    function reachable(){
+      return new Promise(function(resolve){
+        var timer = setTimeout(function(){ resolve(false); }, 8000);
+        try{
+          fetch(String(window.location.href).split("#")[0], {method: "HEAD", cache: "no-store"}).then(function(r){ clearTimeout(timer); resolve(!!(r && r.ok)); }, function(){ clearTimeout(timer); resolve(false); });
+        }catch(e){ clearTimeout(timer); resolve(false); }
+      });
+    }
+    function end(){
+      ending = true;
+      reachable().then(function(ok){
+        if (leaving) return null;
+        if (!ok){ ending = false; return null; }   // as good as offline: wait, and don't count it as a try
+        return flushOwn();
+      }).then(function(clean){
+        if (clean === null || leaving) return;     // (leaving: signed out from elsewhere meanwhile, already reloading)
+        var st = stamp();
+        if (!st){ leave(); return; }               // another page has ended the day meanwhile: start clean like the rest
+        if (st.d === today() || st.x){ ending = false; return; }
+        // Something here still can't be saved: try again at the next look. After
+        // a few goes it is left on this device (it is sent the next time its job
+        // is opened) rather than keeping yesterday's sign-in for ever.
+        if (!clean && tries < MAX_TRIES){ tries++; ending = false; return; }
+        return tellOthers().then(function(){
+          if (leaving) return;
+          var now = stamp();
+          if (!now){ leave(); return; }
+          if (now.d === today() || now.x){ ending = false; return; }
+          leaving = true;
+          try{ if (app.beforeSignOut) app.beforeSignOut(); }catch(e){}
+          set(OUT, today());
+          // (the stamp stays until the sign-in is really gone, so a page starting up
+          // at this very moment still sees it as yesterday's and doesn't carry on with it)
+          return signOutHere().then(function(){ del(DAY); del(ENDING); reload(); });
+        });
+      });
+    }
+    // A Dashboard screen: reload when the site has a newer build than this page.
+    function buildCheck(){
+      var now = Date.now();
+      if (!app.swCache || navigator.onLine === false || now - lastBuild < BUILD_MS) return;
+      lastBuild = now;
+      try{
+        fetch("sw.js", {cache: "no-store"}).then(function(r){ return r.ok ? r.text() : ""; }).then(function(text){
+          var m = /CACHE\s*=\s*["']([^"']+)["']/.exec(text || "");
+          if (!m || m[1] === app.swCache) return;
+          // Once per build - and once more every 45 minutes if the reload came
+          // back as the old page (the files were uploaded a minute apart, or the
+          // connection dropped for a moment). A half-finished upload can't make
+          // the screen reload over and over.
+          var seen = null;
+          try{ seen = JSON.parse(get(SEEN) || "null"); }catch(e){}
+          if (seen && seen.b === m[1] && Date.now() - (Number(seen.t) || 0) < BUILD_AGAIN_MS) return;
+          // someone is using this screen, or it has work to send: leave it for the next look
+          if (Date.now() - lastActive() < QUIET_MS || (app.unsent && app.unsent())) return;
+          // the page itself must be the new one too (the two files can arrive a minute apart)
+          return fetch(String(window.location.href).split("#")[0], {cache: "no-store"}).then(function(r){ return r.ok ? r.text() : ""; }).then(function(page){
+            if (String(page || "").indexOf('"' + m[1] + '"') === -1) return;
+            set(SEEN, JSON.stringify({b: m[1], t: Date.now()}));
+            reload();
+          });
+        }).then(null, function(){});
+      }catch(e){}
+    }
+    // The sign-in went while this page wasn't looking (nothing told it): reload.
+    // (Also what a page calls - as day.recheck() - when it finds for itself that
+    // nobody seems to be signed in any more.)
+    function verify(){
+      if (verifying || navigator.onLine === false) return;
+      var sb = app.sb();
+      if (!sb) return;
+      verifying = true;
+      sb.auth.getSession().then(function(r){
+        verifying = false;
+        var session = r && r.data && r.data.session;
+        if (session && session.user){ if (!stamp()) set(DAY, JSON.stringify({d: today(), s: keyOf(session)})); return; }
+        if (r && r.error) return;   // couldn't tell
+        if (app.signedIn() && !ending && navigator.onLine !== false) leave();
+      }, function(){ verifying = false; });
+    }
+    function check(){
+      if (ending || !app.signedIn()) return;
+      var st = stamp();
+      if (!st){ verify(); return; }
+      if (exempt === null ? st.x : exempt){
+        if (st.d !== today()){ st.d = today(); set(DAY, JSON.stringify(st)); }
+        buildCheck();
+        return;
+      }
+      var now = Date.now();
+      if (st.d === today()){ noticedAt = 0; return; }
+      // The new day, seen for the first time on this page: was anyone working just then?
+      if (!noticedAt){ noticedAt = now; wasQuiet = now - lastActive() >= QUIET_MS; }
+      if (navigator.onLine === false) return;
+      // Nobody was working when the day turned (a tablet waking up): end it now,
+      // even if the screen has been touched since - a wake-up tap, or a few taps
+      // while the Wi-Fi came back. That only holds for the first couple of
+      // minutes; after that, or if someone was working across midnight, it
+      // waits for a pause in the work.
+      if (!(wasQuiet && now - noticedAt <= WAKE_MS) && now - lastActive() < QUIET_MS) return;
+      // a window is open on this page and was touched not long ago (a form half filled in, a slip being signed)
+      try{ if (app.busy && app.busy() && now - lastActive() < BUSY_MS) return; }catch(e){}
+      if (now - lastTry < TICK_MS) return;   // one go per look, however often the screen is touched
+      lastTry = now;
+      end();
+    }
+    // What this login is, once the page knows: true = a Dashboard login,
+    // false = anyone else, null = couldn't find out (keep what was known).
+    function role(isDashboard){
+      if (isDashboard !== null && isDashboard !== undefined){
+        exempt = !!isDashboard;
+        var st = stamp();
+        if (st && !!st.x !== exempt){
+          if (exempt) st.x = 1; else delete st.x;
+          set(DAY, JSON.stringify(st));
+        }
+      }
+      check();
+    }
+    // Signed out somewhere else (another page or tab did it): start again clean.
+    // (If this page is the one doing the signing out, its own steps finish the job.)
+    function signedOut(){
+      if (leaving) return;
+      leave();
+    }
+    // The page's own Sign out button is doing the signing out.
+    function forget(){ ending = true; leaving = true; del(DAY); }
+    function note(){
+      return get(OUT) === today() ? "It's a new day, so everyone was signed out. Sign in again to carry on." : "";
+    }
+    function touch(){
+      var now = Date.now();
+      if (now - lastTouch < 15000) return;
+      // the day's first touch is judged on what came before it
+      check();
+      if (leaving) return;
+      lastTouch = now;
+      set(ACTIVE, String(now));
+    }
+    function start(){
+      setInterval(check, TICK_MS);
+      document.addEventListener("visibilitychange", function(){ if (!document.hidden) check(); });
+      window.addEventListener("focus", check);
+      window.addEventListener("online", check);
+      window.addEventListener("pageshow", check);
+      window.addEventListener("pagehide", function(){ del(HOLD + me); });
+      window.addEventListener("storage", function(ev){ if (ev && ev.key === ENDING && ev.newValue) helpOut(); });
+      ["pointerdown", "keydown", "input"].forEach(function(t){ document.addEventListener(t, touch, true); });
+    }
+    return {accept: accept, endAtStart: endAtStart, role: role, check: check, recheck: verify, signedOut: signedOut, forget: forget, note: note, start: start};
+  }
+  // The sign-in is about to go, or has gone. What is typed here is already kept
+  // on the device; from here nothing more is read (without a sign-in every read
+  // comes back empty, which must not be taken for "this job has no lines").
+  function dayLeave(){
+    writePending(); writeCache();
+    S.leaving = true;
+    clearTimeout(S.saveTimer); clearTimeout(S.retryTimer); clearTimeout(S.liveTimer); clearInterval(S.pollTimer);
+  }
+  var day = makeDayRule({
+    name: "fe", swCache: SW_CACHE,
+    sb: function(){ return S.sb; },
+    signedIn: function(){ return !!S.user; },
+    // what is typed here is kept on the device as it is typed; this sends it
+    flush: function(){
+      if (S.leaving) return Promise.resolve(true);
+      return Promise.resolve(flush()).then(function(){ return !Object.keys(S.pending).length; });
+    },
+    unsent: function(){ return Object.keys(S.pending).length > 0; },
+    // a window with something being filled in (a new job, a paste being checked)
+    busy: function(){ return !$("jobModal").hidden || !$("pasteModal").hidden; },
+    beforeSignOut: dayLeave,
+    beforeReload: dayLeave
+  });
+
   // ---------- sign in ----------
   var libPromise = null;
   function loadSupabaseLib(){
@@ -346,10 +769,11 @@
   // nothing when this page is already signed in, or is in the middle of its
   // own sign-in.
   function pickUpSignIn(){
-    if (!S.sb || S.user || S.signingIn || $("login").hidden) return;
+    // (not while the page is still starting up: that has its own look at the stored sign-in, and decides)
+    if (!S.sb || S.user || S.signingIn || S.starting || $("login").hidden) return;
     S.sb.auth.getSession().then(function(r){
       var session = r && r.data && r.data.session;
-      if (session && session.user && !S.user && !S.signingIn) afterSignIn(session.user);
+      if (session && session.user && !S.user && !S.signingIn && !S.starting && day.accept(session)) afterSignIn(session.user);
     }, function(){});
   }
   function boot(){
@@ -363,6 +787,7 @@
         S.signingIn = false;
         if (r.error){ $("loginErr").textContent = /invalid login/i.test(r.error.message) ? "That email and password don't match." : r.error.message; return; }
         $("loginPassword").value = "";
+        if (r.data.session) day.accept(r.data.session, true);
         return afterSignIn(r.data.user);
       }).catch(function(e){
         $("loginBtn").disabled = false;
@@ -382,23 +807,38 @@
         realtime: {params: {eventsPerSecond: 20}}
       });
       S.sb.auth.onAuthStateChange(function(evt){
-        if (evt === "SIGNED_OUT" && S.user){ leaveJob(); S.user = null; showLogin("You were signed out. Sign in again."); }
+        // signed out somewhere else on the site (or by the new day): what is typed
+        // here is already kept on this device, so start again clean
+        if (evt === "SIGNED_OUT" && S.user) day.signedOut();
         if (evt === "SIGNED_IN") pickUpSignIn();
       });
       // The Database and the Install Tracker share this sign-in. Its arrival in
       // the browser's storage is the other way this page hears that someone has
       // just signed in on one of those, or in another tab.
       window.addEventListener("storage", function(ev){
-        if (ev.newValue && ev.key && /^sb-.+-auth-token$/.test(ev.key)) pickUpSignIn();
+        if (!ev.key || !/^sb-.+-auth-token$/.test(ev.key)) return;
+        if (ev.newValue) pickUpSignIn(); else if (S.user) day.signedOut();
       });
+      day.start();
+      S.starting = true;   // until the stored sign-in has been looked at and decided on, just below
       return S.sb.auth.getSession();
     }).then(function(r){
       var session = r && r.data && r.data.session;
-      if (session && session.user) return afterSignIn(session.user);
+      if (session && session.user){
+        // yesterday's sign-in: it ends here, before anything is shown
+        if (!day.accept(session)){
+          $("loginBtn").disabled = true;   // not until the old sign-in is fully gone
+          return day.endAtStart().then(function(){ S.starting = false; showLogin(day.note()); });
+        }
+        S.starting = false;
+        return afterSignIn(session.user);
+      }
+      S.starting = false;
       var saved = lsJson(K.user);
       if (navigator.onLine === false && saved) return afterSignIn(saved, true);   // offline start on a device that was signed in
-      showLogin("Sign in with the same email and password as the Equipment Database and the Install Tracker.");
+      showLogin(day.note() || "Sign in with the same email and password as the Equipment Database and the Install Tracker.");
     }).catch(function(e){
+      S.starting = false;
       showLogin("Couldn't start: " + (e && e.message ? e.message : e), true);
     });
   }
@@ -417,12 +857,39 @@
     $("userEmail").textContent = S.user.email;
     var profileReq = offline ? Promise.resolve({data: lsJson(K.role), cached: true})
       : Promise.resolve().then(function(){ return S.sb.from("eq_profiles").select("*").eq("id", S.user.id).maybeSingle(); });
+    // The Install Tracker keeps its own list of who is what. A login that is a
+    // Dashboard there is left signed in by the daily sign-out, like one here.
+    var itRoleReq = offline ? Promise.resolve(null)
+      : Promise.resolve().then(function(){ return S.sb.from("it_profiles").select("role").eq("id", S.user.id).maybeSingle(); })
+          .then(function(r){ return r && !r.error ? String((r.data && r.data.role) || "") : null; }, function(){ return null; });
+    var roleKnown = false;
     return profileReq.then(function(pr){
       if (pr.error) throw pr.error;
-      var p = pr.data || {};
-      if (!pr.cached) lsSet(K.role, JSON.stringify({role: p.role || "", job_id: p.job_id || null, staff_kind: p.staff_kind || "", fe_kind: p.fe_kind || ""}));
-      return p;
+      if (pr.cached) return pr.data || {};
+      if (pr.data){
+        roleKnown = true;
+        lsSet(K.role, JSON.stringify({role: pr.data.role || "", job_id: pr.data.job_id || null, staff_kind: pr.data.staff_kind || "", fe_kind: pr.data.fe_kind || ""}));
+        return pr.data;
+      }
+      // No line for this login in the Database's list of accounts. What that
+      // means is the database's call, so ask it: on this set-up the answer is
+      // empty (no access at all); on an older one it says "staff".
+      return Promise.resolve().then(function(){ return S.sb.rpc("eq_my_role"); }).then(function(rr){
+        if (rr.error) return {};   // can't tell: carry on as before (the database decides what is really allowed)
+        var said = Array.isArray(rr.data) ? rr.data[0] : rr.data;
+        if (said){ roleKnown = true; return {role: String(said)}; }
+        // nothing - but a read with no sign-in gets nothing too, so make sure someone is signed in
+        return S.sb.auth.getSession().then(function(sr){
+          if (!(sr && sr.data && sr.data.session)) return lsJson(K.role) || {};
+          roleKnown = true;
+          lsSet(K.role, JSON.stringify({role: "none", job_id: null, staff_kind: "", fe_kind: ""}));
+          return {role: "none"};
+        }, function(){ return lsJson(K.role) || {}; });
+      }, function(){ return {}; });
     }, function(){ return lsJson(K.role) || {}; }).then(function(p){
+      itRoleReq.then(function(itRole){
+        day.role(roleKnown && p.role === "dashboard" ? true : itRole === null || !roleKnown ? null : itRole === "dashboard");
+      });
       S.role = p.role || "staff";
       S.lockedJobId = (S.role === "viewer" || S.role === "tech") ? (p.job_id || null) : null;
       S.feKind = p.fe_kind || "";
@@ -432,9 +899,10 @@
         : S.role === "tech" ? (S.feKind === "pc_fe" ? "PC-FE" : "PC") : p.staff_kind === "admin" ? "Admin" : p.staff_kind === "warehouse" ? "Warehouse" : "";
       $("roleTag").textContent = tag; $("roleTag").hidden = !tag;
       $("jobsBtn").hidden = !!S.lockedJobId;
-      if (S.role === "driver" || S.role === "dashboard"){
+      if (S.role === "driver" || S.role === "dashboard" || S.role === "none"){
         $("jobsView").hidden = true; $("jobView").hidden = true; $("jobsBtn").hidden = true;
-        notice("This login is a " + (S.role === "driver" ? "Driver" : "Dashboard view") + " account, which doesn't have the Field Engineering Tracker. Ask an Admin if you need it.");
+        notice(S.role === "none" ? "This login isn't set up for the Field Engineering Tracker: it has no account type in the Equipment Database. Ask an Admin to give it one (Database > Manage users)."
+          : "This login is a " + (S.role === "driver" ? "Driver" : "Dashboard view") + " account, which doesn't have the Field Engineering Tracker. Ask an Admin if you need it.");
         setStatus("ok", "Signed in");
         return;
       }
@@ -451,6 +919,7 @@
     if (S.saving){ S.saving.then(signOut); return; }
     var waiting = Object.keys(S.pending).length;
     if (waiting && !confirm(waiting + " line" + (waiting === 1 ? " has" : "s have") + " changes that haven't reached the database yet (no connection?).\n\nSign out anyway and lose them?")) return;
+    day.forget();
     leaveJob();
     // nothing about the jobs stays on a device that has been signed out of
     try{
@@ -481,23 +950,65 @@
     var m = String((e && e.message) || "") + " " + String((e && e.code) || "");
     return /fe_devices|fe_save_device/i.test(m) && /does not exist|could not find|not found|PGRST20[25]|42P01|42883/i.test(m);
   }
+  // the same, for what add-fe-job-sources.sql adds (the tracker's own jobs, archiving, Install Tracker projects)
+  function isMissingSources(e){
+    var m = String((e && e.message) || "") + " " + String((e && e.code) || "");
+    return /fe_jobs|fe_job_state|p_source/i.test(m) && /does not exist|could not find|not found|PGRST20[2-5]|42P01|42883/i.test(m);
+  }
+  function newId(){
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(c){
+      var r = Math.random() * 16 | 0;
+      return (c === "x" ? r : (r & 3) | 8).toString(16);
+    });
+  }
 
   // ---------- jobs ----------
-  function jobLabel(j){ return (j.meta && j.meta.project) || j.name || "Untitled job"; }
+  // A job's name, number and address, whichever of the three places it is from.
+  // (The Database keeps them as meta.project / projectNumber / address, the
+  // Install Tracker as meta.projectName / jobNumber / jobAddress; the tracker's
+  // own jobs use the Database's names.)
+  function jobLabel(j){ return (j.meta && (j.meta.project || j.meta.projectName)) || j.name || "Untitled job"; }
+  function jobNumber(j){ var m = j.meta || {}; return String(m.projectNumber || m.jobNumber || "").trim(); }
+  function jobAddress(j){ var m = j.meta || {}; return String(m.address || m.jobAddress || "").trim(); }
+  function jobDetailText(j){ return [jobNumber(j) ? "Job # " + jobNumber(j) : "", jobAddress(j)].filter(Boolean).join(" · "); }
+  function asJob(source, r){
+    // srcArchived: archived in the app it comes from. archived: archived here, in the tracker.
+    return {id: r.id, source: source, name: r.name || "", meta: r.meta || {}, srcArchived: !!r.archived, archived: false};
+  }
   function showJobs(){
     leaveJob();
     $("jobView").hidden = true; $("jobsView").hidden = false;
-    $("subhead").textContent = "Pick a job. Its equipment comes from the Equipment Database.";
     var cached = lsJson(K.jobs);
-    if (cached && !S.jobs.length){ S.jobs = cached; renderJobs(); }
+    if (cached && !S.jobs.length){ S.jobs = cached.map(function(j){ j.source = j.source || "db"; return j; }); renderJobs(); }
     $("jobsMsg").textContent = S.jobs.length ? "" : "Loading jobs...";
     setStatus("busy", "Loading jobs...");
-    return fetchAll(function(){ return S.sb.from("eq_jobs").select("*").eq("deleted", false).order("name", {ascending: true}).order("id", {ascending: true}); }).then(function(list){
-      S.jobs = list.map(function(j){ return {id: j.id, name: j.name, meta: j.meta || {}, archived: !!j.archived}; });
-      lsSet(K.jobs, JSON.stringify(S.jobs));
-      renderJobs();
-      setStatus("ok", "Ready");
-      sendStoredPending();
+    // The other two lists are asked for only once the Database's own list has
+    // answered, and each may be missing (the SQL that adds them not run yet, or
+    // this login not being allowed to see Install Tracker projects) without
+    // taking the Database jobs down with it.
+    var soft = function(p, onMissing){ return p.then(null, function(e){ if (isNetworkProblem(e)) throw e; if (onMissing) onMissing(e); return []; }); };
+    var notSetUp = false;
+    return fetchAll(function(){ return S.sb.from("eq_jobs").select("*").eq("deleted", false).order("name", {ascending: true}).order("id", {ascending: true}); }).then(function(dbJobs){
+      return Promise.all([
+        soft(fetchAll(function(){ return S.sb.from("fe_jobs").select("*").eq("deleted", false).order("name", {ascending: true}).order("id", {ascending: true}); }),
+          function(e){ if (isMissingSources(e)) notSetUp = true; }),
+        soft(fetchAll(function(){ return S.sb.from("fe_job_state").select("job_id,archived").order("job_id", {ascending: true}); })),
+        soft(fetchAll(function(){ return S.sb.from("it_projects").select("id,name,meta,archived").eq("deleted", false).order("name", {ascending: true}).order("id", {ascending: true}); }))
+      ]).then(function(res){
+        S.sourcesReady = !notSetUp;
+        var archivedHere = {};
+        res[1].forEach(function(s){ if (s.archived) archivedHere[s.job_id] = true; });
+        var jobs = dbJobs.map(function(j){ return asJob("db", j); });
+        if (S.sourcesReady) jobs = jobs.concat(res[2].map(function(j){ return asJob("it", j); }), res[0].map(function(j){ return asJob("fe", j); }));
+        jobs.forEach(function(j){ j.archived = !!archivedHere[j.id]; });
+        S.jobs = jobs;
+        lsSet(K.jobs, JSON.stringify(S.jobs));
+        renderJobs();
+        if (!S.job) notice(notSetUp && S.role === "staff" ? SOURCES_MISSING : "");
+        setStatus("ok", "Ready");
+        sendStoredPending();
+      });
     }).catch(function(e){
       renderJobs();
       if (isNetworkProblem(e)) setStatus("bad", "Offline - showing the jobs saved on this device");
@@ -507,17 +1018,35 @@
   function renderJobs(){
     var words = $("jobSearch").value.trim().toLowerCase().split(/\s+/).filter(Boolean);
     var showArchived = $("jobArchived").checked;
+    var kinds = {};
+    S.jobs.forEach(function(j){ kinds[j.source] = true; });
+    // the "which kind" buttons are only worth showing when there is more than one kind to choose between
+    var several = Object.keys(kinds).length > 1;
+    $("srcChips").hidden = !several;
+    if (!several) S.srcFilter = "all";
+    Array.prototype.forEach.call($("srcChips").querySelectorAll("button"), function(b){
+      b.hidden = b.dataset.src !== "all" && !kinds[b.dataset.src];
+      b.classList.toggle("active", b.dataset.src === S.srcFilter);
+    });
+    $("newJobBtn").hidden = !(S.canEdit && S.sourcesReady === true && !S.lockedJobId);
+    $("subhead").textContent = S.sourcesReady === true
+      ? "Pick a job - from the Equipment Database, the Install Tracker, or one made here."
+      : "Pick a job. Its equipment comes from the Equipment Database.";
     var list = S.jobs.filter(function(j){
-      if (j.archived && !showArchived && !words.length) return false;
-      var text = [jobLabel(j), j.name, j.meta.projectNumber, j.meta.address, j.meta.vendor].join(" ").toLowerCase();
+      // ongoing jobs only, unless archived ones are asked for (or being searched for by name)
+      if ((j.archived || j.srcArchived) && !showArchived && !words.length) return false;
+      if (S.srcFilter !== "all" && j.source !== S.srcFilter) return false;
+      var text = [jobLabel(j), j.name, jobNumber(j), jobAddress(j), j.meta.vendor].join(" ").toLowerCase();
       return words.every(function(w){ return text.indexOf(w) !== -1; });
     }).sort(function(a, b){ return jobLabel(a).localeCompare(jobLabel(b), undefined, {numeric: true, sensitivity: "base"}); });
     $("jobList").innerHTML = list.map(function(j){
-      var detail = [j.meta.projectNumber ? "Job # " + j.meta.projectNumber : "", j.meta.address || ""].filter(Boolean).join(" · ");
+      var detail = jobDetailText(j);
       return '<button type="button" class="job-card card" data-job="' + esc(j.id) + '">' +
         '<span class="jn">' + esc(jobLabel(j)) + '</span>' +
         (detail ? '<span class="jd">' + esc(detail) + '</span>' : '') +
-        (j.archived ? '<span class="ja">Archived</span>' : '') + '</button>';
+        '<span class="jtags">' + (several ? '<span class="src-tag src-' + j.source + '">' + esc(SOURCES[j.source] || "") + '</span>' : '') +
+          (j.archived ? '<span class="ja">Archived</span>' : j.srcArchived ? '<span class="ja">Archived in the ' + esc(j.source === "it" ? "Install Tracker" : "Database") + '</span>' : '') +
+        '</span></button>';
     }).join("");
     $("jobsMsg").textContent = list.length ? "" : (S.jobs.length ? "No job matches that." : "No jobs to show.");
   }
@@ -527,7 +1056,7 @@
     return Promise.resolve().then(function(){ return S.sb.from("eq_jobs").select("*").eq("id", id).maybeSingle(); }).then(function(r){
       if (r.error) throw r.error;
       if (!r.data){ notice("The job this login is assigned to wasn't found. Ask an Admin."); return; }
-      return openJob({id: r.data.id, name: r.data.name, meta: r.data.meta || {}, archived: !!r.data.archived});
+      return openJob(asJob("db", r.data));
     }).catch(function(e){
       var c = lsJson(K.cache + id);
       if (c && c.job) return openJob(c.job);
@@ -540,6 +1069,7 @@
     clearTimeout(S.saveTimer); clearTimeout(S.retryTimer); clearTimeout(S.liveTimer); clearInterval(S.pollTimer);
     if (S.channel && S.sb){ try{ S.sb.removeChannel(S.channel); }catch(e){} }
     S.channel = null; S.job = null; S.rows = []; S.dev = {}; S.pending = {};
+    lastPaste = []; showUndoPaste();
   }
   function writeCache(){
     if (!S.job) return;
@@ -549,17 +1079,36 @@
     if (!S.job) return;
     if (Object.keys(S.pending).length) lsSet(K.pending + S.job.id, JSON.stringify(S.pending)); else lsDel(K.pending + S.job.id);
   }
+  // The job's name, where it is from, and the buttons that go with that.
+  function showJobHeader(){
+    var job = S.job;
+    if (!job) return;
+    var own = ownLines(job), setUp = S.sourcesReady === true, free = S.canEdit && !S.lockedJobId && setUp;
+    $("jobTitle").textContent = jobLabel(job);
+    $("jobDetail").textContent = jobDetailText(job) + (job.archived ? (jobDetailText(job) ? " · " : "") + "Archived" : "");
+    $("jobSrcTag").textContent = job.source === "db" ? "From the Database" : job.source === "it" ? "From the Install Tracker" : "Made here";
+    $("jobSrcTag").className = "src-tag src-" + job.source;
+    $("jobSrcTag").hidden = !setUp;
+    $("jobArchiveBtn").hidden = !free;
+    $("jobArchiveBtn").textContent = job.archived ? "Bring back from archive" : "Archive job";
+    $("jobEditBtn").hidden = !(free && job.source === "fe");
+    $("jobDeleteBtn").hidden = !(S.role === "staff" && setUp && job.source === "fe");
+    $("addLineBtn").hidden = $("pasteBtn").hidden = !(own && S.canEdit);
+    var what = own ? (job.source === "it" ? "An Install Tracker project. " : "") + "Its device lines are kept here"
+      : "Equipment from the Database";
+    $("subhead").textContent = S.canEdit
+      ? (own ? what + " - add a line per device, or paste them from Excel. Everything saves as you type." : what + ". Fill in the details for each device - they save as you type.")
+      : what + (own ? "." : ", with the details recorded for each device.") + " This login can look but not change.";
+  }
   function openJob(job){
     leaveJob();
-    S.job = job; S.filter = "all"; S.search = ""; S.sort = null; S.limit = LINES_SHOWN; S.tableMissing = false;
+    S.job = job; S.filter = "all"; S.search = ""; S.sort = null; S.limit = LINES_SHOWN; S.tail = false; S.tableMissing = false;
     lsSet(K.lastJob, job.id);
     $("jobsView").hidden = true; $("jobView").hidden = false;
     $("search").value = "";
     Array.prototype.forEach.call($("chips").querySelectorAll("button"), function(b){ b.classList.toggle("active", b.dataset.st === "all"); });
-    $("jobTitle").textContent = jobLabel(job);
-    $("jobDetail").textContent = [job.meta.projectNumber ? "Job # " + job.meta.projectNumber : "", job.meta.address || ""].filter(Boolean).join(" · ");
-    $("subhead").textContent = S.canEdit ? "Equipment from the Database. Fill in the details for each device - they save as you type."
-      : "Equipment from the Database, with the details recorded for each device. This login can look but not change.";
+    job.source = job.source || "db";
+    showJobHeader();
     // what this device already has: shows at once, and is all there is when offline
     var c = lsJson(K.cache + job.id);
     if (c){ S.rows = c.rows || []; S.dev = c.dev || {}; }
@@ -568,18 +1117,37 @@
     return loadJob(true).then(function(){ subscribe(); flushSoon(0); sendStoredPending(); });
   }
   function loadJob(first){
-    if (!S.job) return Promise.resolve();
-    var jobId = S.job.id, seq = S.saveSeq;
+    if (!S.job || S.leaving) return Promise.resolve();
+    var jobId = S.job.id, seq = S.saveSeq, jobSource = S.job.source || "db";
     if (first) setStatus("busy", "Loading...");
     return Promise.all([
-      fetchAll(function(){ return S.sb.from("eq_rows").select("id,data,pos").eq("job_id", jobId).eq("deleted", false).order("pos", {ascending: true}).order("id", {ascending: true}); }),
-      fetchAll(function(){ return S.sb.from("fe_devices").select("*").eq("job_id", jobId).order("id", {ascending: true}); }).then(null, function(e){
+      // a job with lines of its own has nothing in the Database to read
+      ownLines(S.job) ? Promise.resolve([])
+        : fetchAll(function(){ return S.sb.from("eq_rows").select("id,data,pos").eq("job_id", jobId).eq("deleted", false).order("pos", {ascending: true}).order("id", {ascending: true}); }),
+      // (only this job's own kind of line: a line filed under the same id from another place is never shown)
+      fetchAll(function(){
+        var q = S.sb.from("fe_devices").select("*").eq("job_id", jobId);
+        if (S.sourcesReady === true) q = q.eq("source", jobSource);
+        return q.order("id", {ascending: true});
+      }).then(null, function(e){
         if (!isMissingTable(e)) throw e;
         S.tableMissing = true;
         return [];
       })
     ]).then(function(res){
-      if (!S.job || S.job.id !== jobId) return;
+      if (!S.job || S.job.id !== jobId || S.leaving) return null;
+      if (!res[0].length && !res[1].length && (S.rows.length || Object.keys(S.dev).length)){
+        // Everything "gone" at once is also what the database answers once the
+        // sign-in has gone. Make sure of the sign-in before clearing what is here.
+        return S.sb.auth.getSession().then(function(sr){
+          if (sr && sr.data && sr.data.session) return res;
+          day.recheck();
+          return null;
+        }, function(){ return null; });
+      }
+      return res;
+    }).then(function(res){
+      if (!res || !S.job || S.job.id !== jobId || S.leaving) return;
       // something was saved while this was being read, so what came back may be
       // from before it - read again rather than show the older values
       if (seq !== S.saveSeq || S.saving){ reloadSoon(); return; }
@@ -604,17 +1172,20 @@
     if (!S.job || !S.sb) return;
     var jobId = S.job.id;
     try{
-      S.channel = S.sb.channel("fet-" + jobId + "-" + S.clientId)
+      var ch = S.sb.channel("fet-" + jobId + "-" + S.clientId)
         .on("postgres_changes", {event: "*", schema: "public", table: "fe_devices", filter: "job_id=eq." + jobId}, function(msg){
           var d = msg && msg.new;
           if (!d || !d.row_id || !S.job || S.job.id !== jobId) return;
           var key = d.row_id + "|" + d.unit, have = S.dev[key];
           if (have && have.updated_at && d.updated_at && String(d.updated_at) < String(have.updated_at)) return;   // older than what is here
           S.dev[key] = d;
+          // this page's own save coming back: nothing on screen changes, so nothing is redrawn
+          if (have && !!have.deleted === !!d.deleted && JSON.stringify(have.data || {}) === JSON.stringify(d.data || {})) return;
           renderSoon();
-        })
-        .on("postgres_changes", {event: "*", schema: "public", table: "eq_rows", filter: "job_id=eq." + jobId}, function(){ reloadSoon(); })
-        .subscribe(function(){});
+        });
+      // a Database job's equipment can change under it; a job with its own lines has only the above
+      if (!ownLines(S.job)) ch = ch.on("postgres_changes", {event: "*", schema: "public", table: "eq_rows", filter: "job_id=eq." + jobId}, function(){ reloadSoon(); });
+      S.channel = ch.subscribe(function(){});
     }catch(e){ S.channel = null; }
     clearInterval(S.pollTimer);
     // a tablet's live connection often drops; once a minute the job is read again anyway
@@ -637,7 +1208,21 @@
     return p && p.patch ? Object.assign({}, saved, p.patch) : saved;
   }
   function qtyOf(row){ var n = Number(row.data.totalQty); return n > 0 ? Math.floor(n) : 0; }
+  // A job with lines of its own (an Install Tracker project, or one made
+  // here): every saved record is one line, in the order the lines were added.
+  // Its equipment boxes live in the same record as its network boxes, so the
+  // "row" handed to the rest of the page is simply that record's own data.
+  function buildOwnLines(){
+    var keys = {};
+    Object.keys(S.dev).concat(Object.keys(S.pending)).forEach(function(k){ if (!isDeleted(k)) keys[k] = true; });
+    return Object.keys(keys).map(function(k){
+      var fe = feOf(k), saved = S.dev[k] || {};
+      return {key: k, row: {id: k.slice(0, k.lastIndexOf("|")), data: fe}, unit: 1, pos: 1, count: 1,
+        order: Number(fe.pos) || 0, made: String(saved.created_at || "~")};
+    }).sort(function(a, b){ return (a.order - b.order) || a.made.localeCompare(b.made) || a.key.localeCompare(b.key); });
+  }
   function buildLines(){
+    if (ownLines(S.job)) return buildOwnLines();
     var units = {};
     function add(key){
       if (isDeleted(key)) return;
@@ -658,7 +1243,7 @@
   }
   // the serial number shown: what was typed here, else the one in the Database (first line only)
   function serialOf(line, fe){
-    if (fe.serialNumber) return fe.serialNumber;
+    if (fe.serialNumber || ownLines(S.job)) return String(fe.serialNumber || "");
     return line.unit === 1 ? String(line.row.data.serialNumber || "") : "";
   }
   // what to call a line in a message: its barcode (or make and model), and which one when there are several
@@ -668,7 +1253,7 @@
   }
   function valueOf(line, fe, key){
     if (key === "serialNumber") return serialOf(line, fe);
-    if (key === "qty") return line.count > 1 ? line.pos + " of " + line.count : (qtyOf(line.row) || "");
+    if (key === "qty") return ownLines(S.job) ? String(fe.totalQty == null ? "" : fe.totalQty) : line.count > 1 ? line.pos + " of " + line.count : (qtyOf(line.row) || "");
     if (key === "status") return fe.status || "";
     var db = DB_COLS.filter(function(c){ return c.key === key; })[0];
     return String((db ? line.row.data[key] : fe[key]) == null ? "" : (db ? line.row.data[key] : fe[key]));
@@ -711,7 +1296,7 @@
     html += th("manufacturer", "Manufacturer", 130, ""); n++;
     html += th("model", "Model", 150, ""); n++;
     html += th("deviceType", "Description", 230, "");
-    html += th("qty", "QTY", 96, "");
+    html += th("qty", "QTY", ownLines(S.job) ? 170 : 96, "");
     FE_COLS.forEach(function(c){ html += th(c.key, c.label, c.w, "fe"); });
     return "<tr>" + html + "</tr>";
   }
@@ -728,12 +1313,27 @@
     }
     qtyCell += '</span>';
     var html = '<td class="c-status s1" data-label="Status"><select data-f="status" class="st-' + (st || "none") + '"' + (ro ? " disabled" : "") + '>' +
-      STATUSES.map(function(s){ return '<option value="' + s[0] + '"' + (s[0] === st ? " selected" : "") + '>' + s[1] + '</option>'; }).join("") + '</select></td>' +
-      '<td class="ro c-barcode mono s2" data-label="BarCode">' + esc(d.barcode) + '</td>' +
-      '<td class="ro c-manufacturer s3" data-label="Manufacturer">' + esc(d.manufacturer) + '</td>' +
-      '<td class="ro c-model s4" data-label="Model">' + esc(d.model) + '</td>' +
-      '<td class="ro c-deviceType" data-label="Description">' + esc(d.deviceType) + '</td>' +
-      '<td class="ro c-qty" data-label="QTY">' + qtyCell + '</td>';
+      STATUSES.map(function(s){ return '<option value="' + s[0] + '"' + (s[0] === st ? " selected" : "") + '>' + s[1] + '</option>'; }).join("") + '</select></td>';
+    if (ownLines(S.job)){
+      // the tracker's own line: its equipment columns are boxes like the rest
+      var box = function(f, label, cls, extra){
+        return '<input type="text" data-f="' + f + '" value="' + esc(fe[f] == null ? "" : fe[f]) + '"' + ro + (cls ? ' class="' + cls + '"' : "") + (extra || "") +
+          ' autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore aria-label="' + label + '">';
+      };
+      html += '<td class="c-barcode s2" data-label="BarCode">' + box("barcode", "BarCode", "mono") + '</td>' +
+        '<td class="c-manufacturer s3" data-label="Manufacturer">' + box("manufacturer", "Manufacturer") + '</td>' +
+        '<td class="c-model s4" data-label="Model">' + box("model", "Model") + '</td>' +
+        '<td class="c-deviceType" data-label="Description">' + box("deviceType", "Description") + '</td>' +
+        '<td class="c-qty own-qty" data-label="QTY"><span class="qty">' + box("totalQty", "QTY", "", ' inputmode="numeric"') +
+          (ro ? "" : (ownQty(fe) >= 2 && ownQty(fe) <= SPLIT_MAX ? '<button type="button" class="mini" data-act="splitown" title="Make a line for each of the ' + ownQty(fe) + '">Split</button>' : "") +
+            '<button type="button" class="mini" data-act="remove" title="Remove this line" aria-label="Remove this line">×</button>') + '</span></td>';
+    } else {
+      html += '<td class="ro c-barcode mono s2" data-label="BarCode">' + esc(d.barcode) + '</td>' +
+        '<td class="ro c-manufacturer s3" data-label="Manufacturer">' + esc(d.manufacturer) + '</td>' +
+        '<td class="ro c-model s4" data-label="Model">' + esc(d.model) + '</td>' +
+        '<td class="ro c-deviceType" data-label="Description">' + esc(d.deviceType) + '</td>' +
+        '<td class="ro c-qty" data-label="QTY">' + qtyCell + '</td>';
+    }
     FE_COLS.forEach(function(c){
       var v = valueOf(l, fe, c.key);
       var cls = (c.mono ? "mono " : "") + (c.secret ? "secret " + (S.showSecrets ? "" : "masked ") : "") + (c.key === "serialNumber" && !fe.serialNumber && v ? "from-db" : "");
@@ -753,10 +1353,20 @@
     var all = buildLines(), vis = visibleLines(all);
     S.lines = all;
     $("gridHead").innerHTML = headHtml();
-    $("gridBody").innerHTML = vis.slice(0, S.limit).map(lineHtml).join("");
+    var tail = !!S.tail && vis.length > S.limit;
+    $("gridBody").innerHTML = (tail ? vis.slice(vis.length - S.limit) : vis.slice(0, S.limit)).map(lineHtml).join("");
     var more = $("moreRow");
-    if (!S.rows.length){ more.hidden = false; more.textContent = "This job has no equipment in the Database yet."; }
+    if (!all.length){
+      more.hidden = false;
+      more.textContent = !ownLines(S.job) ? "This job has no equipment in the Database yet."
+        : S.canEdit ? "No lines yet. Click Add line for each device, or Paste from Excel to bring in a list."
+        : "No lines have been added to this job yet.";
+    }
     else if (!vis.length){ more.hidden = false; more.textContent = "Nothing matches the search or filter."; }
+    else if (tail){
+      more.hidden = false;
+      more.innerHTML = "Showing the last " + S.limit + " of " + vis.length + ' lines. <button type="button" id="headBtn">Back to the top of the list</button>';
+    }
     else if (vis.length > S.limit){
       more.hidden = false;
       more.innerHTML = "Showing " + S.limit + " of " + vis.length + ' lines. <button type="button" id="moreBtn">Show ' + Math.min(LINES_SHOWN, vis.length - S.limit) + ' more</button>';
@@ -870,14 +1480,18 @@
   // thing off the waiting list as the database confirms it - unless it has
   // been changed again since it was sent. Resolves with the error that stopped
   // it, or null.
-  function sendPending(jobId, pend, onSaved){
+  function sendPending(jobId, pend, onSaved, source){
     var sent = Object.keys(pend).map(function(k){ var p = pend[k]; return {key: k, patch: Object.assign({}, p.patch || {}), deleted: p.deleted}; });
     var failed = null, i = 0;
     function one(item){
       var cut = item.key.lastIndexOf("|");
       return Promise.resolve().then(function(){
-        return S.sb.rpc("fe_save_device", {p_job: jobId, p_row: item.key.slice(0, cut), p_unit: Number(item.key.slice(cut + 1)), p_patch: item.patch,
-          p_deleted: item.deleted === true || item.deleted === false ? item.deleted : null});
+        var args = {p_job: jobId, p_row: item.key.slice(0, cut), p_unit: Number(item.key.slice(cut + 1)), p_patch: item.patch,
+          p_deleted: item.deleted === true || item.deleted === false ? item.deleted : null};
+        // A Database job is saved exactly as it always was. Only a line of an
+        // Install Tracker project or of a job made here says which it is.
+        if (source && source !== "db") args.p_source = source;
+        return S.sb.rpc("fe_save_device", args);
       }).then(function(r){
         if (r.error) throw r.error;
         var row = Array.isArray(r.data) ? r.data[0] : r.data;
@@ -896,6 +1510,13 @@
     }
     return Promise.all([worker(), worker(), worker()]).then(function(){ return failed; });
   }
+  var SOURCES_MISSING = "One more step for this build: run add-fe-job-sources.sql in the Supabase SQL editor (step 2 in the read-me). Until then this tracker shows Database jobs only - no Install Tracker projects, no jobs of its own, no archiving.";
+  var SOURCES_AGAIN = "Saving is held up: an older set-up file was run after the newest one. Run add-fe-job-sources.sql again in the Supabase SQL editor - that puts it right. Nothing typed here is lost: it is kept on this device and saved once that is done.";
+  // the database has two versions of the save function and can't choose (an older set-up file was run again)
+  function isSaveAmbiguous(e){
+    var m = String((e && e.message) || "") + " " + String((e && e.code) || "");
+    return /PGRST203|best candidate function|is not unique/i.test(m);
+  }
   var MISSING_TABLE = "The database isn't set up for this tracker yet, so nothing can be saved. Run add-field-engineering-tracker.sql in the Supabase SQL editor (step 2 in the read-me), then reload.";
   // resolves when this round of saving is over, whether or not everything went
   function flush(){
@@ -904,16 +1525,21 @@
     var jobId = S.job.id;
     clearTimeout(S.retryTimer); clearTimeout(S.saveTimer);
     setStatus("busy", "Saving...");
+    // (a pasted list is hundreds of saves: if the page is closed half way, the
+    // device must not still say that the lines already saved are waiting)
+    var keepUp = setInterval(function(){ if (S.job && S.job.id === jobId) writePending(); }, 1500);
     S.saving = sendPending(jobId, S.pending, function(key, row){
       if (!S.job || S.job.id !== jobId) return;
       S.dev[key] = row;
       S.saveSeq++;
-    }).then(function(failed){
+    }, S.job.source).then(function(failed){
+      clearInterval(keepUp);
       S.saving = null;
       if (!S.job || S.job.id !== jobId) return;
       writePending(); writeCache();
       if (failed){
         if (isMissingTable(failed)){ S.tableMissing = true; notice(MISSING_TABLE); render(); showSaveState(); return; }
+        if (isSaveAmbiguous(failed)) notice(SOURCES_AGAIN);
         if (isNetworkProblem(failed)) setStatus("bad", "Offline" + pendingNote());
         else { setStatus("bad", "Couldn't save" + pendingNote()); snack("Couldn't save: " + (failed.message || failed)); }
         S.retryTimer = setTimeout(flush, 15000);
@@ -934,10 +1560,15 @@
       if (S.job && S.job.id === jobId) return;
       var pend = lsJson(k);
       if (!pend || !Object.keys(pend).length){ lsDel(k); return; }
-      sendPending(jobId, pend).then(function(){
+      // which kind of job it was is kept with the copy of the job on this device
+      var kept = lsJson(K.cache + jobId), listed = S.jobs.filter(function(j){ return j.id === jobId; })[0];
+      var source = (kept && kept.job && kept.job.source) || (listed && listed.source) || "db";
+      var store = function(){
         if (S.job && S.job.id === jobId) return;   // opened meanwhile: that job's own saving has it now
         if (Object.keys(pend).length) lsSet(k, JSON.stringify(pend)); else lsDel(k);
-      });
+      };
+      var keepUp = setInterval(store, 1500);
+      sendPending(jobId, pend, null, source).then(function(){ clearInterval(keepUp); store(); });
     });
   }
 
@@ -962,8 +1593,11 @@
     writePending(); render(); flushSoon(0);
   }
   function removeUnit(key){
+    // a save on its way could bring the line straight back: let it land first
+    if (S.saving){ S.saving.then(function(){ removeUnit(key); }); return; }
     var fe = feOf(key);
-    var filled = FE_COLS.some(function(c){ return String(fe[c.key] || "").trim(); });
+    var filled = FE_COLS.some(function(c){ return String(fe[c.key] || "").trim(); }) ||
+      (ownLines(S.job) && OWN_FIELDS.some(function(f){ return String(fe[f] == null ? "" : fe[f]).trim(); }));
     if (filled && !confirm("Remove this line? What has been filled in on it will go with it.")) return;
     if (!S.dev[key]){ delete S.pending[key]; }       // never reached the database: nothing to undo there
     else {
@@ -972,6 +1606,345 @@
       S.pending[key] = {patch: clear, deleted: true};
     }
     writePending(); render(); flushSoon(0);
+  }
+
+  // ---------- lines of the tracker's own ----------
+  // (an Install Tracker project, or a job made here: there is no equipment list
+  // in the Database to start from, so the lines are added here)
+  function ownQty(fe){ var n = Number(fe.totalQty); return n > 0 && Math.floor(n) === n ? n : 0; }
+  // where the next line goes: after the last one
+  function nextPos(){
+    var max = 0;
+    buildOwnLines().forEach(function(l){ if (l.order > max) max = l.order; });
+    return Math.floor(max) + 1;
+  }
+  // values: {box: what goes in it}. Gives back the new line's key; the caller saves and redraws.
+  function addOwnLine(values, pos){
+    var key = newId() + "|1", patch = {pos: pos};
+    Object.keys(values || {}).forEach(function(f){
+      var v = String(values[f] == null ? "" : values[f]).trim();
+      if (v !== "") patch[f] = v;
+    });
+    S.pending[key] = {patch: patch, create: true, deleted: false};
+    return key;
+  }
+  // a search or filter would hide a line that has just been added
+  function showAllLines(){
+    S.filter = "all"; S.search = ""; S.sort = null; S.tail = false;
+    $("search").value = "";
+    Array.prototype.forEach.call($("chips").querySelectorAll("button"), function(b){ b.classList.toggle("active", b.dataset.st === "all"); });
+  }
+  function canAddLines(){ return !!S.job && ownLines(S.job) && S.canEdit && !S.tableMissing; }
+  // "QTY 4" on one line becomes four lines of one, each with its own boxes to fill in
+  function splitOwnLine(key){
+    if (!canAddLines()) return;
+    if (S.saving){ S.saving.then(function(){ splitOwnLine(key); }); return; }
+    var fe = feOf(key), n = ownQty(fe);
+    if (n < 2 || n > SPLIT_MAX) return;
+    var base = Number(fe.pos) || 0, copy = {totalQty: "1"};
+    ["barcode", "manufacturer", "model", "deviceType"].forEach(function(f){ copy[f] = fe[f]; });
+    // the new lines sit straight after this one
+    for (var i = 1; i < n; i++) addOwnLine(copy, base + i / 1000);
+    setField(key, "totalQty", "1");
+    S.limit += n - 1;
+    writePending(); render(); flushSoon(0);
+    snack("Made " + n + " lines of one.");
+  }
+
+  // ---------- lines from a spreadsheet ----------
+  var PASTE_MAX = 1000;
+  // without a heading row, the columns are read in this order
+  var PASTE_ORDER = OWN_FIELDS.concat(FE_COLS.map(function(c){ return c.key; }));
+  // the headings a column may have (compared without spaces, capitals or punctuation)
+  var HEADINGS = {
+    barcode: ["barcode", "barcodes", "assettag", "tag"],
+    manufacturer: ["manufacturer", "mfr", "mfg", "make", "brand"],
+    model: ["model", "modelnumber", "modelno", "partnumber", "partno"],
+    deviceType: ["description", "desc", "devicetype", "device", "equipment"],
+    totalQty: ["qty", "quantity", "totalqty"],
+    serialNumber: ["serialnumber", "serial", "serialno", "sn"],
+    mac: ["macaddress", "mac"],
+    location: ["location", "room", "roomnumber", "roomname"],
+    deviceId: ["deviceid", "ipid"],
+    firmware: ["firmwareversion", "firmware", "fw"],
+    hostName: ["hostname", "host"],
+    ip: ["ipaddress", "ip", "ipv4"],
+    subnet: ["subnetmask", "subnet", "netmask"],
+    gateway: ["gateway", "defaultgateway"],
+    dns1: ["dns1", "dns", "primarydns"],
+    dns2: ["dns2", "secondarydns"],
+    login: ["login", "username", "user"],
+    password: ["password"],
+    notes: ["notes", "note", "comments", "comment", "remarks"],
+    status: ["status"]
+  };
+  function fieldLabel(f){
+    var c = FE_COLS.filter(function(x){ return x.key === f; })[0] || DB_COLS.filter(function(x){ return x.key === f; })[0];
+    return c ? c.label : f === "totalQty" ? "QTY" : f === "status" ? "Status" : f;
+  }
+  // What Excel puts on the clipboard: a row per line, tabs between cells, and
+  // quotes round a cell that has a tab, a line break or a quote inside it.
+  function parseTable(text){
+    var rows = [], row = [], cell = "", quoted = false, i = 0, n = text.length, ch;
+    // A quote mark opens a quoted cell only if it is closed again right before a
+    // tab, a line end or the end of the text (that is how Excel writes one).
+    // Otherwise it is just a quote mark someone typed, like "Pro" series.
+    function closesProperly(from){
+      for (var j = from + 1; j < n; j++){
+        if (text.charAt(j) !== '"') continue;
+        if (text.charAt(j + 1) === '"'){ j++; continue; }   // "" inside a quoted cell is one quote mark
+        var next = text.charAt(j + 1);
+        return next === "" || next === "\t" || next === "\n" || next === "\r";
+      }
+      return false;
+    }
+    while (i < n){
+      ch = text.charAt(i);
+      if (quoted){
+        if (ch === '"'){
+          if (text.charAt(i + 1) === '"'){ cell += '"'; i += 2; continue; }
+          quoted = false; i++; continue;
+        }
+        cell += ch; i++; continue;
+      }
+      if (ch === '"' && cell === "" && closesProperly(i)){ quoted = true; i++; continue; }
+      if (ch === "\t"){ row.push(cell); cell = ""; i++; continue; }
+      if (ch === "\r"){ i++; continue; }
+      if (ch === "\n"){ row.push(cell); rows.push(row); row = []; cell = ""; i++; continue; }
+      cell += ch; i++;
+    }
+    if (cell !== "" || row.length){ row.push(cell); rows.push(row); }
+    return rows;
+  }
+  function statusCode(text){
+    var t = String(text).toLowerCase().replace(/[^a-z]/g, "");
+    return t === "inprogress" || t === "started" ? "in_progress" : t === "done" || t === "complete" || t === "completed" ? "done" : t === "na" ? "na" : "";
+  }
+  // rows of cells -> {lines: [{box: value}], heads: the boxes its heading row named (or null)}
+  function linesFromTable(rows){
+    rows = rows.map(function(r){
+      return r.map(function(c){ return String(c == null ? "" : c).replace(/\s*[\r\n]+\s*/g, " ").trim(); });
+    }).filter(function(r){ return r.some(function(c){ return c !== ""; }); });
+    if (!rows.length) return {lines: [], heads: null};
+    var map = {}, found = 0, filled = 0;
+    rows[0].forEach(function(c, i){
+      if (c === "") return;
+      filled++;
+      var name = c.toLowerCase().replace(/[^a-z0-9]/g, "");
+      Object.keys(HEADINGS).some(function(f){
+        if (map[f] !== undefined || HEADINGS[f].indexOf(name) === -1) return false;
+        map[f] = i; found++;
+        return true;
+      });
+    });
+    // A heading row: two or more headings known here (or a single column whose
+    // heading is). But a row of headings never holds a bare number, an IP
+    // address or a MAC address - a first row that does is a device, even if two
+    // of its values happen to be words like "user" and "password".
+    var looksData = rows[0].some(function(c){ return /^\d+([.,]\d+)?$/.test(c) || validIp(c) || /^([0-9a-f]{2}[:-]){5}[0-9a-f]{2}$/i.test(c); });
+    var hasHead = (found >= 2 && !looksData) || (found === 1 && filled === 1);
+    if (hasHead) rows = rows.slice(1);
+    else { map = {}; PASTE_ORDER.forEach(function(f, i){ map[f] = i; }); }
+    var lines = rows.map(function(r){
+      var v = {};
+      Object.keys(map).forEach(function(f){
+        var c = r[map[f]];
+        if (c === undefined || c === "") return;
+        if (f === "status"){ if (statusCode(c)) v.status = statusCode(c); return; }
+        v[f] = f === "mac" ? tidyMac(c) : c;
+      });
+      return v;
+    }).filter(function(v){ return Object.keys(v).length; });
+    return {lines: lines, heads: hasHead ? Object.keys(map) : null};
+  }
+  var pasteParsed = null, pasteTimer = null;
+  function showPasteResult(parsed, problem){
+    pasteParsed = problem ? null : parsed;
+    var msg = $("pasteMsg"), peek = $("pastePeek"), n = parsed ? parsed.lines.length : 0;
+    msg.className = "modal-msg";
+    peek.hidden = true;
+    $("pasteAdd").disabled = true;
+    if (problem){ msg.className = "modal-msg bad"; msg.textContent = problem; return; }
+    if (!n){ msg.textContent = parsed ? "Nothing in that to add." : ""; return; }
+    if (n > PASTE_MAX){
+      pasteParsed = null;
+      msg.className = "modal-msg bad";
+      msg.textContent = "That is " + n + " lines - the most in one go is " + PASTE_MAX + ". Add them in parts.";
+      return;
+    }
+    msg.className = "modal-msg good";
+    msg.textContent = n + " line" + (n === 1 ? "" : "s") + " ready to add. " + (parsed.heads
+      ? "Columns found: " + parsed.heads.map(fieldLabel).join(", ") + "."
+      : "No heading row found, so the columns are read in the order above.");
+    // the first few, as they will be filled in - a quick check that the columns landed in the right boxes
+    peek.innerHTML = parsed.lines.slice(0, 3).map(function(v){
+      return "<div>" + Object.keys(v).map(function(f){
+        var shown = f === "password" ? "(hidden)" : f === "status" ? (STATUSES.filter(function(s){ return s[0] === v[f]; })[0] || ["", ""])[1] : v[f];
+        return "<b>" + esc(fieldLabel(f)) + ":</b> " + esc(shown);
+      }).join(" &nbsp;·&nbsp; ") + "</div>";
+    }).join("") + (n > 3 ? "<div>... and " + (n - 3) + " more</div>" : "");
+    peek.hidden = false;
+    $("pasteAdd").disabled = false;
+  }
+  function openPasteModal(){
+    if (!canAddLines()) return;
+    $("pasteBox").value = ""; $("pasteFile").value = "";
+    showPasteResult(null);
+    $("pasteModal").hidden = false;
+    $("pasteBox").focus();
+  }
+  function readPasteFile(file){
+    if (!file) return;
+    if (typeof XLSX === "undefined"){ showPasteResult(null, "The spreadsheet library didn't load - check the connection, or copy the rows in Excel and paste them into the box instead."); return; }
+    var reader = new FileReader();
+    reader.onerror = function(){ showPasteResult(null, "Couldn't read that file."); };
+    reader.onload = function(){
+      try{
+        var wb = XLSX.read(new Uint8Array(reader.result), {type: "array", raw: true});
+        var ws = wb.Sheets[wb.SheetNames[0]];
+        if (!ws) throw new Error("no sheet");
+        $("pasteBox").value = "";
+        showPasteResult(linesFromTable(XLSX.utils.sheet_to_json(ws, {header: 1, raw: false, defval: "", blankrows: false})));
+        if (pasteParsed && wb.SheetNames.length > 1) $("pasteMsg").textContent += " (Read from the first sheet, " + wb.SheetNames[0] + ".)";
+      }catch(e){ showPasteResult(null, "Couldn't read that file as a spreadsheet."); }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+  // the lines the last paste added, so a paste into the wrong job can be taken back
+  var lastPaste = [];
+  function showUndoPaste(){
+    var b = $("undoPasteBtn");
+    b.hidden = !(lastPaste.length && canAddLines());
+    b.textContent = "Undo paste (" + lastPaste.length + " line" + (lastPaste.length === 1 ? "" : "s") + ")";
+  }
+  function addPastedLines(){
+    if (!pasteParsed || !pasteParsed.lines.length || !canAddLines()) return;
+    var pos = nextPos(), lines = pasteParsed.lines;
+    lastPaste = lines.map(function(v, i){ return addOwnLine(v, pos + i); });
+    showAllLines();   // (also back to the top of the list)
+    $("pasteModal").hidden = true;
+    pasteParsed = null;
+    writePending(); render(); flushSoon(0);
+    showUndoPaste();
+    snack("Added " + lines.length + " line" + (lines.length === 1 ? "" : "s") + ". They are being saved now.");
+  }
+  function undoPaste(){
+    if (!lastPaste.length || !canAddLines()) return;
+    // a save on its way could bring a line straight back: let it land first
+    if (S.saving){ S.saving.then(undoPaste); return; }
+    var keys = lastPaste.filter(function(k){ return !isDeleted(k) && (S.dev[k] || S.pending[k]); });
+    if (!confirm("Remove the " + keys.length + " line" + (keys.length === 1 ? "" : "s") + " that paste added? Anything filled in on them since goes too.")) return;
+    keys.forEach(function(k){
+      if (!S.dev[k]){ delete S.pending[k]; return; }
+      var clear = {};
+      Object.keys(S.dev[k].data || {}).forEach(function(f){ clear[f] = ""; });
+      S.pending[k] = {patch: clear, deleted: true};
+    });
+    lastPaste = [];
+    writePending(); render(); flushSoon(0);
+    showUndoPaste();
+  }
+
+  // ---------- jobs made here, and archiving ----------
+  var jobEditing = null;
+  function rememberJobs(){ lsSet(K.jobs, JSON.stringify(S.jobs)); }
+  function openJobModal(job){
+    if (!S.canEdit || S.lockedJobId || S.sourcesReady !== true) return;
+    jobEditing = job || null;
+    $("jobModalTitle").textContent = job ? "Job details" : "New job";
+    $("jobModalSub").hidden = !!job;
+    $("jobFormName").value = job ? (job.name || jobLabel(job)) : "";
+    $("jobFormNumber").value = job ? jobNumber(job) : "";
+    $("jobFormAddress").value = job ? jobAddress(job) : "";
+    $("jobFormMsg").textContent = ""; $("jobFormMsg").className = "modal-msg";
+    $("jobFormSave").textContent = job ? "Save" : "Create job";
+    $("jobFormSave").disabled = false;
+    $("jobModal").hidden = false;
+    $("jobFormName").focus();
+  }
+  function saveJobForm(){
+    var name = $("jobFormName").value.trim(), job = jobEditing, msg = $("jobFormMsg");
+    if (!name || !S.sb) return;
+    var meta = Object.assign({}, job ? job.meta : {}, {projectNumber: $("jobFormNumber").value.trim(), address: $("jobFormAddress").value.trim()});
+    var who = (S.user && S.user.email) || "";
+    $("jobFormSave").disabled = true;
+    msg.className = "modal-msg"; msg.textContent = "Saving...";
+    Promise.resolve().then(function(){
+      return job
+        ? S.sb.from("fe_jobs").update({name: name, meta: meta, updated_by: who}).eq("id", job.id).select().maybeSingle()
+        : S.sb.from("fe_jobs").insert({id: newId(), name: name, meta: meta, created_by: who, updated_by: who}).select().maybeSingle();
+    }).then(function(r){
+      if (r.error) throw r.error;
+      if (!r.data) throw new Error("the database didn't take it - this login may not be allowed to");
+      $("jobModal").hidden = true;
+      if (job){
+        job.name = r.data.name || name; job.meta = r.data.meta || meta;
+        var listed = S.jobs.filter(function(j){ return j.id === job.id; })[0];
+        if (listed && listed !== job){ listed.name = job.name; listed.meta = job.meta; }
+        rememberJobs();
+        if (S.job && S.job.id === job.id){ writeCache(); showJobHeader(); }
+        snack("Job details saved.");
+        return;
+      }
+      var made = asJob("fe", r.data);
+      S.jobs.push(made);
+      rememberJobs();
+      return openJob(made);
+    }).catch(function(e){
+      $("jobFormSave").disabled = false;
+      msg.className = "modal-msg bad";
+      msg.textContent = isNetworkProblem(e) ? "You're offline - this needs a connection." : "Couldn't save: " + (e && e.message ? e.message : e);
+    });
+  }
+  // Archiving only hides a job from this tracker's list. The job itself - in the
+  // Database, the Install Tracker or here - and everything filled in stay as they are.
+  function archiveJob(){
+    var job = S.job, btn = $("jobArchiveBtn");
+    if (!job || !S.sb || !S.canEdit || S.lockedJobId) return;
+    var to = !job.archived;
+    var where = job.source === "db" ? " It stays as it is in the Equipment Database." : job.source === "it" ? " It stays as it is in the Install Tracker." : "";
+    if (to && !confirm('Archive "' + jobLabel(job) + '"?\n\nThis only takes it off this tracker\'s job list - nothing is deleted.' + where + '\n\nTick "Show archived jobs" to find it again.')) return;
+    btn.disabled = true;
+    Promise.resolve(flush()).then(function(){
+      return S.sb.from("fe_job_state").upsert({job_id: job.id, source: job.source, archived: to, updated_by: (S.user && S.user.email) || ""}, {onConflict: "job_id"});
+    }).then(function(r){
+      if (r.error) throw r.error;
+      job.archived = to;
+      var listed = S.jobs.filter(function(j){ return j.id === job.id; })[0];
+      if (listed) listed.archived = to;
+      rememberJobs();
+      btn.disabled = false;
+      if (!to){ if (S.job === job){ writeCache(); showJobHeader(); } snack("Back on the job list."); return; }
+      lsDel(K.lastJob);
+      snack('Archived. Tick "Show archived jobs" to find it again.');
+      if (S.job === job) return showJobs();
+    }).catch(function(e){
+      btn.disabled = false;
+      snack(isNetworkProblem(e) ? "You're offline - archiving needs a connection." : "Couldn't " + (to ? "archive" : "bring back") + " the job: " + (e && e.message ? e.message : e));
+    });
+  }
+  // full-access staff only, and only a job that was made here
+  function deleteJob(){
+    var job = S.job, btn = $("jobDeleteBtn");
+    if (!job || job.source !== "fe" || S.role !== "staff" || !S.sb) return;
+    var n = buildOwnLines().length;
+    if (!confirm('Delete "' + jobLabel(job) + '"' + (n ? " and its " + n + " line" + (n === 1 ? "" : "s") : "") + "?\n\nIt goes from this tracker for everyone. (To only tidy it out of the list, use Archive job instead.)")) return;
+    btn.disabled = true;
+    Promise.resolve().then(function(){
+      return S.sb.from("fe_jobs").update({deleted: true, updated_by: (S.user && S.user.email) || ""}).eq("id", job.id).select().maybeSingle();
+    }).then(function(r){
+      if (r.error) throw r.error;
+      if (!r.data) throw new Error("the database didn't take it - this login may not be allowed to");
+      btn.disabled = false;
+      S.jobs = S.jobs.filter(function(j){ return j.id !== job.id; });
+      rememberJobs();
+      lsDel(K.lastJob); lsDel(K.cache + job.id); lsDel(K.pending + job.id);
+      snack("Job deleted.");
+      if (S.job === job){ S.pending = {}; return showJobs(); }
+    }).catch(function(e){
+      btn.disabled = false;
+      snack(isNetworkProblem(e) ? "You're offline - deleting needs a connection." : "Couldn't delete the job: " + (e && e.message ? e.message : e));
+    });
   }
 
   // ---------- spreadsheet ----------
@@ -997,7 +1970,7 @@
     var out = XLSX.write(wb, {bookType: "xlsx", type: "array"});
     var now = new Date(), p2 = function(n){ return String(n).padStart(2, "0"); };
     var stamp = p2(now.getHours()) + p2(now.getMinutes()) + "-" + p2(now.getMonth() + 1) + p2(now.getDate()) + String(now.getFullYear()).slice(2);
-    var name = [jobLabel(S.job), S.job.meta.projectNumber || "", "Field Engineering", stamp].filter(Boolean).join(" - ").replace(/[\\/:*?"<>|]+/g, " ") + ".xlsx";
+    var name = [jobLabel(S.job), jobNumber(S.job), "Field Engineering", stamp].filter(Boolean).join(" - ").replace(/[\\/:*?"<>|]+/g, " ") + ".xlsx";
     var a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([out], {type: "application/octet-stream"}));
     a.download = name;
@@ -1023,11 +1996,11 @@
     });
   });
   $("signOutBtn").addEventListener("click", signOut);
-  $("search").addEventListener("input", function(){ S.search = $("search").value.trim(); S.limit = LINES_SHOWN; render(); });
+  $("search").addEventListener("input", function(){ S.search = $("search").value.trim(); S.limit = LINES_SHOWN; S.tail = false; render(); });
   $("chips").addEventListener("click", function(ev){
     var b = ev.target.closest("button[data-st]");
     if (!b) return;
-    S.filter = b.dataset.st; S.limit = LINES_SHOWN;
+    S.filter = b.dataset.st; S.limit = LINES_SHOWN; S.tail = false;
     Array.prototype.forEach.call($("chips").querySelectorAll("button"), function(x){ x.classList.toggle("active", x === b); });
     render();
   });
@@ -1042,6 +2015,7 @@
     var key = th.dataset.sort;
     // first click A to Z, second Z to A, third back to the Database's own order
     S.sort = !S.sort || S.sort.key !== key ? {key: key, dir: 1} : S.sort.dir === 1 ? {key: key, dir: -1} : null;
+    S.tail = false;
     render();
   });
   // a tablet has no pointer to hover with: stepping into a flagged box says what is wrong with it
@@ -1050,7 +2024,9 @@
     if (t && t.matches && t.matches("input.bad, input.warn") && t.title) snack(t.title);
   });
   $("moreRow").addEventListener("click", function(ev){
+    if (ev.target.id === "headBtn"){ S.tail = false; render(); return; }
     if (ev.target.id !== "moreBtn") return;
+    S.tail = false;
     S.limit += LINES_SHOWN; render();
   });
   var body = $("gridBody");
@@ -1098,10 +2074,75 @@
     var key = b.closest("tr").dataset.key, rowId = key.slice(0, key.lastIndexOf("|"));
     var row = S.rows.filter(function(r){ return r.id === rowId; })[0];
     if (b.dataset.act === "remove"){ removeUnit(key); return; }
+    if (b.dataset.act === "splitown"){ splitOwnLine(key); return; }
     if (!row) return;
     var have = buildLines().filter(function(l){ return l.row.id === rowId; }).length;
     addUnits(rowId, b.dataset.act === "split" ? Math.max(0, qtyOf(row) - have) : 1);
   });
+  // which kind of job the list shows
+  $("srcChips").addEventListener("click", function(ev){
+    var b = ev.target.closest("button[data-src]");
+    if (!b) return;
+    S.srcFilter = b.dataset.src;
+    renderJobs();
+  });
+  $("newJobBtn").addEventListener("click", function(){ openJobModal(null); });
+  $("jobEditBtn").addEventListener("click", function(){ if (S.job && S.job.source === "fe") openJobModal(S.job); });
+  $("jobArchiveBtn").addEventListener("click", archiveJob);
+  $("jobDeleteBtn").addEventListener("click", deleteJob);
+  $("jobForm").addEventListener("submit", function(ev){ ev.preventDefault(); saveJobForm(); });
+  $("jobFormCancel").addEventListener("click", function(){ $("jobModal").hidden = true; });
+  $("addLineBtn").addEventListener("click", function(){
+    if (!canAddLines()) return;
+    showAllLines();
+    var key = addOwnLine({}, nextPos());
+    S.tail = buildOwnLines().length > S.limit;   // a long list: draw its end, where the new line is
+    writePending(); render(); flushSoon(0);
+    var box = document.querySelector('tr[data-key="' + key + '"] [data-f="barcode"]');
+    if (box){ box.focus(); try{ box.scrollIntoView({block: "nearest"}); }catch(e){} }
+  });
+  $("pasteBtn").addEventListener("click", openPasteModal);
+  $("undoPasteBtn").addEventListener("click", undoPaste);
+  $("pasteBox").addEventListener("input", function(){
+    clearTimeout(pasteTimer);
+    pasteTimer = setTimeout(function(){
+      var text = $("pasteBox").value;
+      $("pasteFile").value = "";
+      showPasteResult(text.trim() ? linesFromTable(parseTable(text)) : null);
+    }, 200);
+  });
+  $("pasteFile").addEventListener("change", function(){ readPasteFile($("pasteFile").files && $("pasteFile").files[0]); });
+  $("pasteAdd").addEventListener("click", addPastedLines);
+  $("pasteCancel").addEventListener("click", function(){ $("pasteModal").hidden = true; });
+  // a small window closes on Escape, or on a click beside it
+  ["jobModal", "pasteModal"].forEach(function(id){
+    $(id).addEventListener("mousedown", function(ev){ if (ev.target === $(id)) $(id).hidden = true; });
+  });
+  document.addEventListener("keydown", function(ev){
+    if (ev.key !== "Escape") return;
+    $("jobModal").hidden = true; $("pasteModal").hidden = true;
+  });
+  // The Split button comes and goes with what is in a typed-in line's QTY box.
+  // Only that one line is touched: drawing the whole list again here would take
+  // the cursor away just as it moves on to the next box.
+  $("gridBody").addEventListener("change", function(ev){
+    var t = ev.target;
+    if (!t || !t.dataset || t.dataset.f !== "totalQty" || !ownLines(S.job) || !S.canEdit || S.tableMissing) return;
+    var tr = t.closest("tr"), holder = tr && tr.querySelector(".qty");
+    if (!holder) return;
+    var n = ownQty(feOf(tr.dataset.key)), want = n >= 2 && n <= SPLIT_MAX;
+    var have = holder.querySelector('[data-act="splitown"]');
+    if (have && !want) have.parentNode.removeChild(have);
+    if (!want) return;
+    if (!have){
+      have = document.createElement("button");
+      have.type = "button"; have.className = "mini"; have.setAttribute("data-act", "splitown"); have.textContent = "Split";
+      holder.insertBefore(have, holder.querySelector('[data-act="remove"]'));
+    }
+    have.title = "Make a line for each of the " + n;
+  });
+  // closing or leaving the page in the middle of a save: what is still waiting is written down first
+  window.addEventListener("pagehide", function(){ if (!S.leaving){ writePending(); writeCache(); } });
   window.addEventListener("online", function(){ if (S.job){ flushSoon(0); loadJob(false); } });
   window.addEventListener("offline", showSaveState);
   document.addEventListener("visibilitychange", function(){
