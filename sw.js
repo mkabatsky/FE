@@ -1,7 +1,7 @@
 // Service worker for the tab page: lets it open offline and pick up new versions when online.
-// Bump CACHE (v2 -> v3 ...) whenever you upload a new index.html so tablets refresh.
+// Bump CACHE (v1 -> v2 ...) whenever you upload a new index.html so tablets refresh.
 // The three apps inside the tabs are looked after by their own service workers, not this one.
-var CACHE = "apps-page-v2";
+var CACHE = "apps-page-v1";
 var CORE = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./apple-touch-icon.png"];
 
 self.addEventListener("install", function(e){
