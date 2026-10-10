@@ -1,6 +1,6 @@
 // Service worker: lets the app open offline and pick up new versions when online.
 // Bump CACHE (v2 -> v3 ...) whenever you upload a new index.html so tablets refresh.
-var CACHE = "field-eng-v3";
+var CACHE = "field-eng-v4";
 var CORE = ["./", "./index.html", "./config.js", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./apple-touch-icon.png"];
 // only these outside sites are ever cached; the database (supabase.co) must never be
 var CACHEABLE_HOSTS = ["cdn.jsdelivr.net", "cdnjs.cloudflare.com", "fonts.googleapis.com", "fonts.gstatic.com"];

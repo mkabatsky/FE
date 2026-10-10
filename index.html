@@ -209,7 +209,7 @@
     <div class="brand">
       <div class="badge">FE</div>
       <div>
-        <h1>Field Engineering Tracker<span class="build" id="buildTag" title="Build 3 - October 9, 2026">Build 3</span></h1>
+        <h1>Field Engineering Tracker<span class="build" id="buildTag" title="Build 4 - October 9, 2026">Build 4</span></h1>
         <p class="sub" id="subhead">Equipment from the Database, with the network and set-up details for each device.</p>
       </div>
     </div>
@@ -369,10 +369,16 @@
   var SOURCES = {db: "Database", it: "Install Tracker", fe: "Made here"};
   function ownLines(job){ return !!job && job.source !== "db"; }
   var OWN_FIELDS = ["barcode", "manufacturer", "model", "deviceType", "totalQty"];
-  var SW_CACHE = "field-eng-v3";   // the same name as CACHE in sw.js
+  var SW_CACHE = "field-eng-v4";   // the same name as CACHE in sw.js
 
   var S = {
-    sb: null, user: null, role: "staff", lockedJobId: null, canEdit: false,
+    sb: null, user: null, role: "none", lockedJobId: null, canEdit: false,
+    who: null,           // what the database says this login is (see "what this login may do here"); empty on an older database
+    whoState: "",        // "known" = asked just now, "kept" = from this device's memory, "unknown", "old" = an older database
+    whoTurn: 0, whoTimer: null,
+    whoRefusedAt: 0,     // when the database was last asked again because it had refused a save (once a minute at most)
+    oneJob: false,       // on exactly one job (and not on every job): there is no job list to go back to
+    jobsLoaded: false,   // the job list on screen is the database's own, not this device's copy of it
     jobs: [], job: null,
     sourcesReady: null,  // has add-fe-job-sources.sql been run? null = not known yet
     srcFilter: "all",    // which kind of job the list is showing
@@ -383,7 +389,7 @@
     filter: "all", search: "", sort: null, limit: LINES_SHOWN, showSecrets: false, tableMissing: false,
     clientId: "f" + Math.random().toString(36).slice(2, 10)
   };
-  var K = {user: "fet.user", role: "fet.role", jobs: "fet.jobs", lastJob: "fet.lastJob", cache: "fet.cache.", pending: "fet.pending."};
+  var K = {user: "fet.user", role: "fet.role", who: "fet.who", jobs: "fet.jobs", lastJob: "fet.lastJob", cache: "fet.cache.", pending: "fet.pending."};
 
   function $(id){ return document.getElementById(id); }
   function esc(s){ return String(s === undefined || s === null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
@@ -430,7 +436,7 @@
   //        beforeSignOut() -> called just before the sign-in is taken away}
   function makeDayRule(app){
     var DAY = "mkapps.signInDay", ACTIVE = "mkapps.lastActive", OUT = "mkapps.dayOut", SEEN = "mkapps.buildSeen." + app.name;
-    var ENDING = "mkapps.dayEnding", HOLD = "mkapps.dayHold.";
+    var ENDING = "mkapps.dayEnding", HOLD = "mkapps.dayHold.", BUSY = "mkapps.dayBusy.";
     var QUIET_MS = 3 * 60000, TICK_MS = 30000, BUILD_MS = 10 * 60000, BUILD_AGAIN_MS = 45 * 60000, MAX_TRIES = 5;
     var WAKE_MS = 2 * 60000;        // for this long after the new day is first seen, "nobody was working then" still decides it
     var BUSY_MS = 30 * 60000;       // an open window holds the sign-out back only while it was touched this recently
@@ -439,6 +445,7 @@
     var leaving = false;   // ...and the sign-in is going or gone: nothing more to do here but reload
     var tries = 0, lastTry = 0, exempt = null, lastTouch = 0, lastBuild = Date.now(), verifying = false;
     var noticedAt = 0, wasQuiet = false;
+    var ownTouch = 0;      // when THIS page was last touched (the shared "last active" mark is about all of them)
     var me = Math.random().toString(36).slice(2, 10);
     function get(k){ try{ return window.localStorage.getItem(k); }catch(e){ return null; } }
     function set(k, v){ try{ window.localStorage.setItem(k, v); }catch(e){} }
@@ -465,6 +472,32 @@
     function quiet(){
       return navigator.onLine !== false && Date.now() - lastActive() >= QUIET_MS;
     }
+    // A window is open on this page with something half filled in (a slip being
+    // signed, a form), and it was touched not long ago. The sign-out waits for
+    // it - on this page and, through a mark the other pages can see, on all of
+    // them: one sign-in covers every page, so any of them could end the day.
+    function busyHere(){
+      try{ return !!(app.busy && app.busy()) && Date.now() - ownTouch < BUSY_MS; }catch(e){ return false; }
+    }
+    function markBusy(){
+      var k = BUSY + me, v = busyHere() ? String(ownTouch) : null;
+      if (v === null){ if (get(k) !== null) del(k); }
+      else if (get(k) !== v) set(k, v);
+    }
+    // (a mark says when that page's window was last touched; it goes when the
+    // window is closed or the page is, and counts for nothing once it is old)
+    function othersBusy(){
+      var now = Date.now(), any = false;
+      try{
+        for (var i = window.localStorage.length - 1; i >= 0; i--){
+          var k = window.localStorage.key(i);
+          if (!k || k.indexOf(BUSY) !== 0 || k === BUSY + me) continue;
+          var age = now - (Number(get(k)) || 0);
+          if (age < BUSY_MS) any = true; else del(k);
+        }
+      }catch(e){}
+      return any;
+    }
     // A page is about to carry on with this sign-in (fresh = the password was
     // just typed). False = it is from an earlier day: don't carry on, call
     // endAtStart() and show the sign-in form.
@@ -476,7 +509,8 @@
         if (fresh) del(OUT);
         return true;
       }
-      return st.d === today() || !!st.x || !quiet();
+      // (someone is in the middle of a form on another page: carry on for now, the day ends when they are done)
+      return st.d === today() || !!st.x || !quiet() || othersBusy();
     }
     // Ends the sign-in on this device. Signing out needs the server to answer;
     // if it doesn't, what the browser keeps of the sign-in is removed anyway.
@@ -513,12 +547,19 @@
       leaving = true; ending = true;
       reload();
     }
+    // A page starting up with yesterday's sign-in ends it here. Gives true when
+    // the sign-in is gone (show the sign-in form), false when the site can't be
+    // reached just now: then nothing is signed out - carry on with the sign-in,
+    // and the day ends at the first look once the site answers again.
     function endAtStart(){
       ending = true; leaving = true;
-      set(OUT, today());
-      // (the stamp stays until the sign-in is really gone, so another page that
-      // is starting up at the same moment still sees it as yesterday's)
-      return signOutHere().then(function(){ del(DAY); ending = false; leaving = false; });
+      return reachable().then(function(ok){
+        if (!ok){ ending = false; leaving = false; return false; }
+        set(OUT, today());
+        // (the stamp stays until the sign-in is really gone, so another page that
+        // is starting up at the same moment still sees it as yesterday's)
+        return signOutHere().then(function(){ del(DAY); ending = false; leaving = false; return true; });
+      });
     }
     // send what this page hasn't saved yet - and don't wait on it for ever
     function flushOwn(){
@@ -556,6 +597,7 @@
     // ...and the other side of that: another page is about to end the day.
     function helpOut(){
       if (ending || leaving || !app.signedIn()) return;
+      markBusy();   // a window opened here since that page last looked: it sees the mark and waits
       set(HOLD + me, String(Date.now()));
       var done = function(){ del(HOLD + me); };
       try{ Promise.resolve(app.flush()).then(done, done); }catch(e){ done(); }
@@ -591,6 +633,8 @@
           var now = stamp();
           if (!now){ leave(); return; }
           if (now.d === today() || now.x){ ending = false; return; }
+          // someone opened a window (here or on another page) while this was getting ready: not now
+          if (busyHere() || othersBusy()){ ending = false; del(ENDING); return; }
           leaving = true;
           try{ if (app.beforeSignOut) app.beforeSignOut(); }catch(e){}
           set(OUT, today());
@@ -645,6 +689,7 @@
     }
     function check(){
       if (ending || !app.signedIn()) return;
+      markBusy();
       var st = stamp();
       if (!st){ verify(); return; }
       if (exempt === null ? st.x : exempt){
@@ -663,8 +708,8 @@
       // minutes; after that, or if someone was working across midnight, it
       // waits for a pause in the work.
       if (!(wasQuiet && now - noticedAt <= WAKE_MS) && now - lastActive() < QUIET_MS) return;
-      // a window is open on this page and was touched not long ago (a form half filled in, a slip being signed)
-      try{ if (app.busy && app.busy() && now - lastActive() < BUSY_MS) return; }catch(e){}
+      // a window is open, on this page or another, and was touched not long ago (a form half filled in, a slip being signed)
+      if (busyHere() || othersBusy()) return;
       if (now - lastTry < TICK_MS) return;   // one go per look, however often the screen is touched
       lastTry = now;
       end();
@@ -695,6 +740,7 @@
     }
     function touch(){
       var now = Date.now();
+      ownTouch = now;
       if (now - lastTouch < 15000) return;
       // the day's first touch is judged on what came before it
       check();
@@ -708,7 +754,7 @@
       window.addEventListener("focus", check);
       window.addEventListener("online", check);
       window.addEventListener("pageshow", check);
-      window.addEventListener("pagehide", function(){ del(HOLD + me); });
+      window.addEventListener("pagehide", function(){ del(HOLD + me); del(BUSY + me); });
       window.addEventListener("storage", function(ev){ if (ev && ev.key === ENDING && ev.newValue) helpOut(); });
       ["pointerdown", "keydown", "input"].forEach(function(t){ document.addEventListener(t, touch, true); });
     }
@@ -828,7 +874,14 @@
         // yesterday's sign-in: it ends here, before anything is shown
         if (!day.accept(session)){
           $("loginBtn").disabled = true;   // not until the old sign-in is fully gone
-          return day.endAtStart().then(function(){ S.starting = false; showLogin(day.note()); });
+          return day.endAtStart().then(function(gone){
+            S.starting = false;
+            // The site can't be reached just now, so nothing was signed out:
+            // carry on with the sign-in that is here. The day ends at the first
+            // look once the site answers again.
+            if (gone === false){ $("loginBtn").disabled = !CFG; return afterSignIn(session.user); }
+            showLogin(day.note());
+          });
         }
         S.starting = false;
         return afterSignIn(session.user);
@@ -842,6 +895,316 @@
       showLogin("Couldn't start: " + (e && e.message ? e.message : e), true);
     });
   }
+  // ---------- what this login may do here, as the database says it ----------
+  // After a sign-in the page asks the database one question (ax_whoami) and is
+  // told the login's level in each of the three apps, whether it sees every
+  // job there, and the jobs it has been put on in Manage users:
+  //   {db, it, fe:  the level - "none", "viewer", "participant" or "staff"
+  //                 (the Database and the Install Tracker also have
+  //                 "dashboard", the Database "driver"),
+  //    db_all, it_all, fe_all:  true = sees every job in that app,
+  //    jobs: [{s: "db" | "it" | "fe" (where the job lives), j: the job's id,
+  //            l: "participant" (takes part) | "viewer" (looks only)}]}
+  // Only the Field Engineering level ("fe") decides what may be done here.
+  // "db" and "it" are read for one thing: the daily sign-out leaves a
+  // Dashboard login signed in.
+
+  // The answer, tidied. Anything missing or not understood counts as the least
+  // it could mean (no level, not every job, looks only). null = not an answer.
+  function cleanWho(a){
+    if (Array.isArray(a)) a = a[0];
+    if (!a || typeof a !== "object" || typeof a.fe !== "string") return null;
+    var level = function(v, known){ v = String(v || ""); return known.indexOf(v) !== -1 ? v : "none"; };
+    var fe = level(a.fe, ["viewer", "participant", "staff"]);
+    var jobs = (Array.isArray(a.jobs) ? a.jobs : []).filter(function(x){
+      return !!x && (x.s === "db" || x.s === "it" || x.s === "fe") && !!x.j;
+    }).map(function(x){ return {s: x.s, j: String(x.j), l: x.l === "participant" ? "participant" : "viewer"}; });
+    return {
+      v: Number(a.v) || 1,
+      db: level(a.db, ["viewer", "participant", "staff", "driver", "dashboard"]),
+      db_kind: a.db_kind === "admin" || a.db_kind === "warehouse" ? a.db_kind : "",
+      it: level(a.it, ["viewer", "participant", "staff", "dashboard"]),
+      fe: fe,
+      db_all: a.db_all === true, it_all: a.it_all === true,
+      // (full access sees every job, as the database's own rules have it)
+      fe_all: fe === "staff" || (fe !== "none" && a.fe_all === true),
+      job_emails: a.job_emails === true,
+      jobs: jobs
+    };
+  }
+  // The database answered with an error. Is it saying that it doesn't have the
+  // question at all? Then the job matrix isn't there yet (add-job-matrix.sql
+  // has not been run) and this page carries on exactly as Build 3 did.
+  // Anything else - no connection, a sign-in that has just run out, a refusal
+  // - is "couldn't ask", which is a different thing.
+  function whoIsOldDatabase(r){
+    var e = r && r.error;
+    if (!e) return false;
+    var code = String(e.code || ""), msg = String(e.message || "");
+    if (r.status === 0) return false;   // the request never reached the database
+    if (code === "42501" || r.status === 401 || r.status === 403 || /permission denied|jwt/i.test(msg)) return false;
+    return code === "PGRST202" || r.status === 404 || /ax_whoami/.test(msg);
+  }
+  // Is this job one the login is shown here? Every job when it sees them all;
+  // otherwise only a job it has been put on.
+  function whoSees(who, source, jobId){
+    if (!who || who.fe === "none") return false;
+    if (who.fe_all) return true;
+    return who.jobs.some(function(x){ return x.s === source && x.j === String(jobId); });
+  }
+  // Does the login TAKE PART on this job (may it fill in the device details)?
+  // Full access: always. A participant: on a job it is shown, unless it was put
+  // on that job to look only. A viewer: never, whatever is ticked for it.
+  function whoTakesPart(who, source, jobId){
+    if (!whoSees(who, source, jobId)) return false;
+    if (who.fe === "staff") return true;
+    if (who.fe !== "participant") return false;
+    return !who.jobs.some(function(x){ return x.s === source && x.j === String(jobId) && x.l === "viewer"; });
+  }
+  // The job list as this login is shown it. The database limits the list
+  // already - but a login that sees every job in ANOTHER app is sent those jobs
+  // too, and here it is only on the ones ticked for it.
+  function whoJobs(who, jobs){
+    return (jobs || []).filter(function(j){ return whoSees(who, j.source || "db", j.id); });
+  }
+  // What the answer means for this page, in one place.
+  function whoPlan(who){
+    var fe = who ? who.fe : "none", fills = fe === "staff" || fe === "participant", wide = !!who && fe !== "none" && who.fe_all === true;
+    return {
+      access: fe !== "none",       // false = the "doesn't have this app" notice and nothing else
+      fills: fills,                // fills in device details at all (job by job: whoTakesPart)
+      wide: wide,                  // sees every job; false = only the jobs it is on
+      manages: fills && wide,      // New job, Job details, Archive
+      deletes: fe === "staff",     // Delete job
+      dashboard: !!who && (who.db === "dashboard" || who.it === "dashboard")   // left signed in by the daily sign-out
+    };
+  }
+  // The words added to the "doesn't have this app" notice when lines typed on
+  // this device are still waiting to be saved: this login can't save them, and
+  // nothing else on that screen would say that they are there.
+  function whoLeftText(lines){
+    if (!lines) return "";
+    var one = lines === 1;
+    return " " + lines + " line" + (one ? "" : "s") + " typed on this device earlier " + (one ? "was" : "were") + " never saved. Tell the office - " + (one ? "it is" : "they are") + " still kept on this device.";
+  }
+  // The small label beside the e-mail address at the top.
+  function whoTag(who, onlyLooksHere){
+    var fe = who ? who.fe : "none";
+    if (fe === "viewer") return "Viewer - read only";
+    if (fe === "participant") return onlyLooksHere ? "Participant - read only on this job" : "Participant";
+    if (fe === "staff") return who.db_kind === "admin" ? "Admin" : who.db_kind === "warehouse" ? "Warehouse" : "";
+    return "";
+  }
+  // Where the page starts once the job list is in. A login that is on exactly
+  // one job (and doesn't see them all) goes straight into it, with no job list
+  // to go back to. Everyone else gets the list - opened at the job that was
+  // open last time, if that is still on it.
+  function whoStart(who, jobs, lastId){
+    if (!whoPlan(who).wide && jobs.length === 1) return {job: jobs[0], oneJob: true};
+    return {job: jobs.filter(function(j){ return j.id === lastId; })[0] || null, oneJob: false};
+  }
+  // A save came back with an error. Is it the database's own rules turning it
+  // down - "this login may not change that job"? (Its words for that are about
+  // a "row-level security policy", or "permission denied"; its code is 42501.)
+  function whoRefused(e){
+    return !!e && (String(e.code || "") === "42501" || /row-level security|permission denied/i.test(String(e.message || "")));
+  }
+  // The words for lines that were typed on this device, never saved, and can't
+  // be saved by this login (it only looks at their job now, or isn't on it):
+  // how many lines, and which jobs. names = those jobs that are on this login's
+  // own list; a job that isn't is only counted (others) - never named.
+  function whoHeldText(lines, names, others){
+    var jobs = (names || []).slice();
+    if (others) jobs.push(others === 1 ? "a job that is not on this login's list" : others + " jobs that are not on this login's list");
+    var one = lines === 1, oneJob = (names || []).length + (others || 0) === 1;
+    return lines + " line" + (one ? "" : "s") + " typed on this device earlier " + (one ? "was" : "were") + " never saved (" + jobs.join(", ") +
+      "): this login can't change " + (oneJob ? "that job" : "those jobs") + ". Tell the office - " + (one ? "it is" : "they are") + " still kept on this device.";
+  }
+
+  // ---------- the same, for the login that is signed in ----------
+  // S.who is the answer the page is going by. On an older database it stays
+  // empty (see afterSignIn), and everything below answers as Build 3 did.
+  var NOBODY = cleanWho({fe: "none"});   // "not known" is treated as a login with nothing
+  var NO_ACCESS = "This login doesn't have the Field Engineering Tracker. Ask an Admin (Equipment Database > Manage users).";
+  var NO_JOBS = "No job is assigned to this login yet - ask the office.";
+  var WHO_UNKNOWN = "Couldn't check what this login may do here - the database can't be reached just now. Nothing is shown until that is known. The page asks again by itself: every half minute, and as soon as the connection is back.";
+  // The one question the rest of the page asks about a job.
+  function takesPart(source, jobId){ return whoTakesPart(S.who, source || "db", jobId); }
+  // S.canEdit is what every box, button and save on the page looks at. With
+  // the job matrix it is settled job by job, each time a job is opened or left
+  // (with no job open: does this login fill in anywhere at all?).
+  function applyAccess(){
+    if (!S.who) return;
+    S.canEdit = S.job ? takesPart(S.job.source, S.job.id) : whoPlan(S.who).fills;
+    var tag = whoTag(S.who, !!S.job && !S.canEdit);
+    $("roleTag").textContent = tag; $("roleTag").hidden = !tag;
+  }
+  // New job, Job details and Archive are for a login that sees every job here
+  // (the database refuses them from anyone else). Build 3 asked "is this login
+  // tied to one job?" instead.
+  function mayManageJobs(){ return S.who ? whoPlan(S.who).manages : !S.lockedJobId; }
+  function shownJobs(list){ return S.who ? whoJobs(S.who, list) : list; }
+  function noJobsText(){ return S.who && !S.who.fe_all && S.jobsLoaded ? NO_JOBS : "No jobs to show."; }
+  // How many lines are waiting on this device to be saved, for ANY job - not
+  // only the one that is open. Signing out clears everything the tracker keeps
+  // here, so it asks first while this is not 0 (the lines may be waiting for a
+  // job this login can no longer change, and then nothing else would say so).
+  function linesWaitingAnywhere(){
+    var n = 0;
+    try{
+      for (var i = 0; i < localStorage.length; i++){
+        var k = localStorage.key(i), p = k && k.indexOf(K.pending) === 0 ? lsJson(k) : null;
+        if (p && typeof p === "object") n += Object.keys(p).length;
+      }
+    }catch(e){}
+    return n;
+  }
+
+  // A save the database's rules turn down. The page asks what a login may do
+  // when it signs in; if the office then puts the login on a job to look only,
+  // or takes it off, the first the page hears of it is a save being refused.
+  // So it asks again there and then, and sets itself up for the new answer
+  // (askWhoAgain, below). A refusal that keeps coming although the answer is
+  // unchanged is not asked about every time the save is tried again (that is
+  // every quarter minute): once a minute at most.
+  // Gives true when the error was such a refusal. On an older database (S.who
+  // empty) it does nothing and gives false: there the page is as Build 3 was.
+  var SAVE_REFUSED = "Couldn't save: the database says this login may not change this job. Ask the office.";
+  function saveRefused(e){
+    if (!S.who || !e || isNetworkProblem(e) || !whoRefused(e)) return false;
+    var since = Date.now() - S.whoRefusedAt;
+    if ((since < 0 || since >= 60000) && S.user && !S.leaving){
+      S.whoRefusedAt = Date.now();
+      S.whoState = "kept";   // (no longer known to be how things stand - askWhoAgain asks only then)
+      askWhoAgain();
+    }
+    return true;
+  }
+
+  // The last answer is kept on the device together with the login it was for,
+  // so the page can start without a connection (a comms room) as that login.
+  function keptWho(uid){
+    var k = lsJson(K.who);
+    return k && k.uid === uid ? cleanWho(k.who) : null;
+  }
+  // Asks. Gives {state, who}:
+  //   "known"    the database answered - who is its answer
+  //   "old"      the database doesn't have the question: the job matrix has
+  //              not been set up there yet
+  //   "kept"     couldn't ask - who is the answer kept on this device
+  //   "unknown"  couldn't ask, and nothing is kept for this login
+  // "Couldn't ask" never turns into more than was last known: with nothing
+  // kept, nothing is shown - never everything.
+  function askWho(uid, offline){
+    function fallBack(){
+      var kept = keptWho(uid);
+      return kept ? {state: "kept", who: kept} : {state: "unknown", who: null};
+    }
+    if (offline || !S.sb || navigator.onLine === false) return Promise.resolve(fallBack());
+    var timer = null;
+    // (a connection that neither answers nor fails is "couldn't ask" too)
+    var slow = new Promise(function(done){ timer = setTimeout(function(){ done(fallBack()); }, 15000); });
+    var asked = Promise.resolve().then(function(){ return S.sb.rpc("ax_whoami"); }).then(function(r){
+      if (r && r.error){
+        if (!whoIsOldDatabase(r)) return fallBack();
+        lsDel(K.who);   // (an answer kept from a set-up that is no longer there)
+        return {state: "old", who: null};
+      }
+      var who = cleanWho(r && r.data);
+      if (!who) return fallBack();
+      lsSet(K.who, JSON.stringify({uid: uid, who: who}));
+      return {state: "known", who: who};
+    }, fallBack);
+    return Promise.race([asked, slow]).then(function(res){ clearTimeout(timer); return res; });
+  }
+  // Who is this, and what may they do here? The database is asked at every
+  // sign-in, and nothing is taken for granted from the time before:
+  //   - it answers: the page goes by the answer (startWithWho);
+  //   - it doesn't have the question: an older database - the page carries on
+  //     exactly as Build 3 did (afterSignInOld, kept whole further down);
+  //   - it can't be reached: the answer kept on this device for this same
+  //     login, and with none kept, nothing at all until it can be asked.
+  function afterSignIn(user, offline){
+    S.user = {id: user.id, email: user.email || ""};
+    lsSet(K.user, JSON.stringify(S.user));
+    $("userEmail").textContent = S.user.email;
+    clearTimeout(S.whoTimer);
+    var uid = S.user.id, turn = ++S.whoTurn;
+    return askWho(uid, offline).then(function(res){
+      // (signed out, or signed in as someone else, while this was being asked)
+      if (!S.user || S.user.id !== uid || turn !== S.whoTurn || S.leaving) return;
+      if (res.state === "old"){ S.who = null; S.whoState = "old"; S.oneJob = false; return afterSignInOld(user, offline); }
+      return startWithWho(res);
+    });
+  }
+  // Sets the page up for an answer (or for "not known").
+  function startWithWho(res){
+    var who = res.who || NOBODY, plan = whoPlan(who);
+    S.who = who; S.whoState = res.state; S.oneJob = false; S.jobsLoaded = false;
+    S.whoRefusedAt = 0;   // (a new answer, or a new login: the next save the database refuses is asked about at once)
+    // The words the rest of the page looks at: full access only when the
+    // database says so for THIS app, and nobody is "tied to one job" any more.
+    S.role = who.fe; S.lockedJobId = null; S.feKind = "";
+    S.jobs = whoJobs(who, S.jobs);
+    applyAccess();
+    // A Dashboard login - in the Database or in the Install Tracker; there is
+    // none here - is left signed in by the daily sign-out. An answer from the
+    // device's memory says nothing new about that, so what was known stays.
+    day.role(res.state === "known" ? plan.dashboard : null);
+    $("login").hidden = true; $("app").hidden = false;
+    if (res.state !== "known"){
+      S.whoTimer = setTimeout(askWhoAgain, 30000);
+      day.recheck();   // (if it is the sign-in itself that has gone, this finds out and starts the page again)
+    }
+    if (!plan.access){
+      leaveJob();
+      S.jobs = [];
+      $("jobsView").hidden = true; $("jobView").hidden = true; $("jobsBtn").hidden = true;
+      notice(res.state === "unknown" ? WHO_UNKNOWN : NO_ACCESS + whoLeftText(linesWaitingAnywhere()));
+      setStatus(res.state === "unknown" ? "bad" : "ok", res.state === "unknown" ? "Couldn't check this login" : "Signed in");
+      return;
+    }
+    notice("");
+    $("jobsBtn").hidden = false;
+    var last = lsGet(K.lastJob);
+    return showJobs().then(function(){
+      if (S.who !== who || S.job) return;
+      var start = whoStart(who, S.jobs, last);
+      S.oneJob = start.oneJob;
+      $("jobsBtn").hidden = start.oneJob;
+      if (start.job) return openJob(start.job);
+    });
+  }
+  // The answer in use came from the device's memory, or there is none: ask the
+  // database again - every half minute, and when the connection comes back.
+  function askWhoAgain(){
+    clearTimeout(S.whoTimer);
+    if (!S.user || !S.who || S.whoState === "known" || S.leaving) return;
+    var uid = S.user.id, turn = ++S.whoTurn;
+    var again = function(){ clearTimeout(S.whoTimer); S.whoTimer = setTimeout(askWhoAgain, 30000); };
+    askWho(uid, false).then(function(res){
+      if (!S.user || S.user.id !== uid || turn !== S.whoTurn || S.leaving) return;
+      if (res.state === "kept" || res.state === "unknown"){ again(); day.recheck(); return; }
+      // the same as the page is already going by: nothing on screen moves
+      if (res.state === "known" && JSON.stringify(res.who) === JSON.stringify(S.who)){
+        S.whoState = "known";
+        day.role(whoPlan(res.who).dashboard);
+        return;
+      }
+      // Something is different: set the page up again from the start. (What is
+      // typed is kept on the device as it is typed; a save on its way is let
+      // finish first.)
+      return Promise.resolve(S.saving).then(function(){
+        if (!S.user || S.user.id !== uid || turn !== S.whoTurn || S.leaving) return;
+        if (res.state === "old"){ S.who = null; S.whoState = "old"; S.oneJob = false; return afterSignInOld(S.user); }
+        return startWithWho(res);
+      });
+    }).then(null, again);
+  }
+
+  // ---------- an older database: who is this, as Build 3 worked it out ----------
+  // (Kept exactly as it was. It runs only when the database says it doesn't
+  // have the job matrix yet - see afterSignIn above.)
   // Who is this, and what may they do here? The roles are the Equipment
   // Database's own (its eq_profiles table), since the equipment comes from it:
   //   full access (Admin, Warehouse, Staff)   - fill everything in
@@ -851,7 +1214,7 @@
   // PC-FE / FE / FE Viewer are marked by eq_profiles.fe_kind on top of the role: a PC-FE
   // is a PC ("tech") underneath; an FE and an FE Viewer are Viewers underneath, and FE is
   // the one Viewer that may fill in (the database rule says the same).
-  function afterSignIn(user, offline){
+  function afterSignInOld(user, offline){
     S.user = {id: user.id, email: user.email || ""};
     lsSet(K.user, JSON.stringify(S.user));
     $("userEmail").textContent = S.user.email;
@@ -918,6 +1281,7 @@
   function signOut(){
     if (S.saving){ S.saving.then(signOut); return; }
     var waiting = Object.keys(S.pending).length;
+    if (S.who) waiting = Math.max(waiting, linesWaitingAnywhere());   // (the job matrix: lines waiting for any job on this device)
     if (waiting && !confirm(waiting + " line" + (waiting === 1 ? " has" : "s have") + " changes that haven't reached the database yet (no connection?).\n\nSign out anyway and lose them?")) return;
     day.forget();
     leaveJob();
@@ -928,6 +1292,8 @@
       del.forEach(lsDel);
     }catch(e){}
     var u = S.user; S.user = null; S.jobs = [];
+    clearTimeout(S.whoTimer);
+    S.who = null; S.whoState = ""; S.oneJob = false; S.jobsLoaded = false;
     Promise.resolve(S.sb ? S.sb.auth.signOut() : null).then(function(){}, function(){}).then(function(){
       showLogin("Signed out" + (u && u.email ? " (" + u.email + ")" : "") + ". This also signs out of the Database and the Install Tracker in this browser.");
     });
@@ -980,7 +1346,7 @@
     leaveJob();
     $("jobView").hidden = true; $("jobsView").hidden = false;
     var cached = lsJson(K.jobs);
-    if (cached && !S.jobs.length){ S.jobs = cached.map(function(j){ j.source = j.source || "db"; return j; }); renderJobs(); }
+    if (cached && !S.jobs.length){ S.jobs = shownJobs(cached.map(function(j){ j.source = j.source || "db"; return j; })); renderJobs(); }
     $("jobsMsg").textContent = S.jobs.length ? "" : "Loading jobs...";
     setStatus("busy", "Loading jobs...");
     // The other two lists are asked for only once the Database's own list has
@@ -1002,7 +1368,8 @@
         var jobs = dbJobs.map(function(j){ return asJob("db", j); });
         if (S.sourcesReady) jobs = jobs.concat(res[2].map(function(j){ return asJob("it", j); }), res[0].map(function(j){ return asJob("fe", j); }));
         jobs.forEach(function(j){ j.archived = !!archivedHere[j.id]; });
-        S.jobs = jobs;
+        S.jobs = shownJobs(jobs);
+        S.jobsLoaded = true;
         lsSet(K.jobs, JSON.stringify(S.jobs));
         renderJobs();
         if (!S.job) notice(notSetUp && S.role === "staff" ? SOURCES_MISSING : "");
@@ -1028,7 +1395,7 @@
       b.hidden = b.dataset.src !== "all" && !kinds[b.dataset.src];
       b.classList.toggle("active", b.dataset.src === S.srcFilter);
     });
-    $("newJobBtn").hidden = !(S.canEdit && S.sourcesReady === true && !S.lockedJobId);
+    $("newJobBtn").hidden = !(S.canEdit && S.sourcesReady === true && mayManageJobs());
     $("subhead").textContent = S.sourcesReady === true
       ? "Pick a job - from the Equipment Database, the Install Tracker, or one made here."
       : "Pick a job. Its equipment comes from the Equipment Database.";
@@ -1048,7 +1415,7 @@
           (j.archived ? '<span class="ja">Archived</span>' : j.srcArchived ? '<span class="ja">Archived in the ' + esc(j.source === "it" ? "Install Tracker" : "Database") + '</span>' : '') +
         '</span></button>';
     }).join("");
-    $("jobsMsg").textContent = list.length ? "" : (S.jobs.length ? "No job matches that." : "No jobs to show.");
+    $("jobsMsg").textContent = list.length ? "" : (S.jobs.length ? "No job matches that." : noJobsText());
   }
   function openJobById(id){
     var known = S.jobs.filter(function(j){ return j.id === id; })[0];
@@ -1070,6 +1437,7 @@
     if (S.channel && S.sb){ try{ S.sb.removeChannel(S.channel); }catch(e){} }
     S.channel = null; S.job = null; S.rows = []; S.dev = {}; S.pending = {};
     lastPaste = []; showUndoPaste();
+    applyAccess();
   }
   function writeCache(){
     if (!S.job) return;
@@ -1077,13 +1445,14 @@
   }
   function writePending(){
     if (!S.job) return;
+    if (S.who && !S.canEdit) return;   // (looking only: what is kept for this job on the device is left as it is - see openJob)
     if (Object.keys(S.pending).length) lsSet(K.pending + S.job.id, JSON.stringify(S.pending)); else lsDel(K.pending + S.job.id);
   }
   // The job's name, where it is from, and the buttons that go with that.
   function showJobHeader(){
     var job = S.job;
     if (!job) return;
-    var own = ownLines(job), setUp = S.sourcesReady === true, free = S.canEdit && !S.lockedJobId && setUp;
+    var own = ownLines(job), setUp = S.sourcesReady === true, free = S.canEdit && mayManageJobs() && setUp;
     $("jobTitle").textContent = jobLabel(job);
     $("jobDetail").textContent = jobDetailText(job) + (job.archived ? (jobDetailText(job) ? " · " : "") + "Archived" : "");
     $("jobSrcTag").textContent = job.source === "db" ? "From the Database" : job.source === "it" ? "From the Install Tracker" : "Made here";
@@ -1108,11 +1477,20 @@
     $("search").value = "";
     Array.prototype.forEach.call($("chips").querySelectorAll("button"), function(b){ b.classList.toggle("active", b.dataset.st === "all"); });
     job.source = job.source || "db";
+    applyAccess();   // may this login fill in THIS job?
     showJobHeader();
     // what this device already has: shows at once, and is all there is when offline
     var c = lsJson(K.cache + job.id);
     if (c){ S.rows = c.rows || []; S.dev = c.dev || {}; }
     S.pending = lsJson(K.pending + job.id) || {};
+    if (S.who && !S.canEdit && Object.keys(S.pending).length){
+      // Typed on this device earlier, never saved - and this login may now only
+      // look at this job, so it can't save them. What is on screen is the job
+      // as everyone else sees it; the unsaved changes stay on the device.
+      var held = Object.keys(S.pending).length;
+      S.pending = {};
+      snack(held + " line" + (held === 1 ? "" : "s") + " changed on this device earlier " + (held === 1 ? "was" : "were") + " never saved, and this login can now only look at this job. Ask the office.");
+    }
     render();
     return loadJob(true).then(function(){ subscribe(); flushSoon(0); sendStoredPending(); });
   }
@@ -1510,14 +1888,16 @@
     }
     return Promise.all([worker(), worker(), worker()]).then(function(){ return failed; });
   }
-  var SOURCES_MISSING = "One more step for this build: run add-fe-job-sources.sql in the Supabase SQL editor (step 2 in the read-me). Until then this tracker shows Database jobs only - no Install Tracker projects, no jobs of its own, no archiving.";
+  var SOURCES_MISSING = "One more step: run add-fe-job-sources.sql in the Supabase SQL editor. Until then this tracker shows Database jobs only - no Install Tracker projects, no jobs of its own, no archiving.";
   var SOURCES_AGAIN = "Saving is held up: an older set-up file was run after the newest one. Run add-fe-job-sources.sql again in the Supabase SQL editor - that puts it right. Nothing typed here is lost: it is kept on this device and saved once that is done.";
+  // (the same, on a database with the job matrix: there add-job-matrix.sql is the newest file, and running it again is the whole repair)
+  var SOURCES_AGAIN_MATRIX = "Saving is held up: an older set-up file was run after the newest one. Run add-job-matrix.sql again in the Supabase SQL editor - that puts it right. Nothing typed here is lost: it is kept on this device and saved once that is done.";
   // the database has two versions of the save function and can't choose (an older set-up file was run again)
   function isSaveAmbiguous(e){
     var m = String((e && e.message) || "") + " " + String((e && e.code) || "");
     return /PGRST203|best candidate function|is not unique/i.test(m);
   }
-  var MISSING_TABLE = "The database isn't set up for this tracker yet, so nothing can be saved. Run add-field-engineering-tracker.sql in the Supabase SQL editor (step 2 in the read-me), then reload.";
+  var MISSING_TABLE = "The database isn't set up for this tracker yet, so nothing can be saved. Run add-field-engineering-tracker.sql in the Supabase SQL editor, then reload.";
   // resolves when this round of saving is over, whether or not everything went
   function flush(){
     if (S.saving) return S.saving;
@@ -1539,9 +1919,10 @@
       writePending(); writeCache();
       if (failed){
         if (isMissingTable(failed)){ S.tableMissing = true; notice(MISSING_TABLE); render(); showSaveState(); return; }
-        if (isSaveAmbiguous(failed)) notice(SOURCES_AGAIN);
+        if (isSaveAmbiguous(failed)) notice(S.who ? SOURCES_AGAIN_MATRIX : SOURCES_AGAIN);
+        var refused = saveRefused(failed);   // (true only with the job matrix, when the database's rules turned the save down)
         if (isNetworkProblem(failed)) setStatus("bad", "Offline" + pendingNote());
-        else { setStatus("bad", "Couldn't save" + pendingNote()); snack("Couldn't save: " + (failed.message || failed)); }
+        else { setStatus("bad", "Couldn't save" + pendingNote()); snack(refused ? SAVE_REFUSED : "Couldn't save: " + (failed.message || failed)); }
         S.retryTimer = setTimeout(flush, 15000);
         return;
       }
@@ -1552,8 +1933,11 @@
   // Changes typed with no connection wait on this device under their job. If
   // the job they belong to isn't the one open now, they are sent from here.
   function sendStoredPending(){
-    if (!S.sb || !S.canEdit || navigator.onLine === false) return;
-    var keys = [];
+    // (with the job matrix a login that fills in nowhere still goes through what
+    // is waiting: nothing is sent for it, but what it can't save is counted)
+    var fills = S.who ? whoPlan(S.who).fills : S.canEdit;
+    if (!S.sb || (!S.who && !fills) || navigator.onLine === false) return;
+    var keys = [], held = 0, heldNames = [], heldOthers = 0;
     try{ for (var i = 0; i < localStorage.length; i++){ var k = localStorage.key(i); if (k && k.indexOf(K.pending) === 0) keys.push(k); } }catch(e){}
     keys.forEach(function(k){
       var jobId = k.slice(K.pending.length);
@@ -1563,13 +1947,24 @@
       // which kind of job it was is kept with the copy of the job on this device
       var kept = lsJson(K.cache + jobId), listed = S.jobs.filter(function(j){ return j.id === jobId; })[0];
       var source = (kept && kept.job && kept.job.source) || (listed && listed.source) || "db";
+      if (S.who && (!fills || !takesPart(source, jobId))){
+        // This login only looks at that job, or isn't on it: it can't save these
+        // lines (the database would refuse them). They wait on this device, and
+        // the person is told - the job by name only when it is on this login's
+        // own list (the device's copy of a job it isn't shown is never quoted).
+        held += Object.keys(pend).length;
+        if (listed) heldNames.push(jobLabel(listed)); else heldOthers++;
+        return;
+      }
       var store = function(){
         if (S.job && S.job.id === jobId) return;   // opened meanwhile: that job's own saving has it now
         if (Object.keys(pend).length) lsSet(k, JSON.stringify(pend)); else lsDel(k);
       };
       var keepUp = setInterval(store, 1500);
-      sendPending(jobId, pend, null, source).then(function(){ clearInterval(keepUp); store(); });
+      // (a refusal by the database's rules here too means the login was changed since it signed in: saveRefused asks again)
+      sendPending(jobId, pend, null, source).then(function(failed){ clearInterval(keepUp); store(); saveRefused(failed); });
     });
+    if (held) snack(whoHeldText(held, heldNames, heldOthers));
   }
 
   // ---------- lines for the 2nd, 3rd... of an equipment line ----------
@@ -1849,7 +2244,7 @@
   var jobEditing = null;
   function rememberJobs(){ lsSet(K.jobs, JSON.stringify(S.jobs)); }
   function openJobModal(job){
-    if (!S.canEdit || S.lockedJobId || S.sourcesReady !== true) return;
+    if (!S.canEdit || !mayManageJobs() || S.sourcesReady !== true) return;
     jobEditing = job || null;
     $("jobModalTitle").textContent = job ? "Job details" : "New job";
     $("jobModalSub").hidden = !!job;
@@ -1900,7 +2295,7 @@
   // Database, the Install Tracker or here - and everything filled in stay as they are.
   function archiveJob(){
     var job = S.job, btn = $("jobArchiveBtn");
-    if (!job || !S.sb || !S.canEdit || S.lockedJobId) return;
+    if (!job || !S.sb || !S.canEdit || !mayManageJobs()) return;
     var to = !job.archived;
     var where = job.source === "db" ? " It stays as it is in the Equipment Database." : job.source === "it" ? " It stays as it is in the Install Tracker." : "";
     if (to && !confirm('Archive "' + jobLabel(job) + '"?\n\nThis only takes it off this tracker\'s job list - nothing is deleted.' + where + '\n\nTick "Show archived jobs" to find it again.')) return;
@@ -2144,6 +2539,7 @@
   // closing or leaving the page in the middle of a save: what is still waiting is written down first
   window.addEventListener("pagehide", function(){ if (!S.leaving){ writePending(); writeCache(); } });
   window.addEventListener("online", function(){ if (S.job){ flushSoon(0); loadJob(false); } });
+  window.addEventListener("online", askWhoAgain);
   window.addEventListener("offline", showSaveState);
   document.addEventListener("visibilitychange", function(){
     if (document.hidden){ if (Object.keys(S.pending).length) flush(); }
